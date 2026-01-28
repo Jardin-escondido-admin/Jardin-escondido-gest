@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>💵 Caja - Jardín Escondido</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { overscroll-behavior: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .slide-up { animation: slideUp 0.3s ease-out; }
+    @media print {
+      body * { visibility: hidden; }
+      #ticket-print, #ticket-print * { visibility: visible; }
+      #ticket-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #000;
+        background: #fff;
+      }
+    }
+    .ticket-font { font-family: 'Courier New', monospace; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app">
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600">
+      <div class="text-center text-white">
+        <div class="text-6xl mb-4">💵</div>
+        <p class="text-lg">Cargando caja...</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="ticket-print" class="hidden"></div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { getFirestore, collection, doc, setDoc, addDoc, getDoc, getDocs, onSnapshot, query, orderBy, where, serverTimestamp, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    // ========== FIREBASE CONFIG ==========
+    const firebaseConfig = {
+      apiKey: "AIzaSyAVB0cuMbczpdp1EXWZZaXV2uEoW0LiYPo",
+      authDomain: "jardin-escondido.firebaseapp.com",
+      projectId: "jardin-escondido",
+      storageBucket: "jardin-escondido.firebasestorage.app",
+      messagingSenderId: "41075573711",
+      appId: "1:41075573711:web:1566bc05ec7048d4fa48ba"
+    };
+
+    const appFB = initializeApp(firebaseConfig);
+    const auth = getAuth(appFB);
+    const db = getFirestore(appFB, 'jardin-escondido-db');
+
+    // ========== ESTADO ==========
+    let usuario = null;
+    let usuarioData = null;
+    let ordenes = [];
+    let ordenSeleccionada = null;
+    let vista = 'ordenes'; // ordenes, corte, historial
+    let checadaHoy = null;
+    let corteCaja = {
+      fondoInicial: 0,
+      efectivo: 0,
+      tarjeta: 0,
+      transferencia: 0,
+      ventas: [],
+      gastos: []
+    };
+    let cajaAbierta = false;
+    let fondoInicial = 0;
+
+    // Roles permitidos
+    const ROLES_PERMITIDOS = ['admin', 'cajero', 'gerente'];
+    
+    // Logo para tickets (escala de grises)
+    const LOGO_TICKET = 'data:image/jpeg;base64,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';
+
+    // ========== UTILIDADES ==========
+    const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+    const fmtHora = (fecha) => {
+      if (!fecha) return '-';
+      const d = fecha.toDate ? fecha.toDate() : new Date(fecha);
+      return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    // ========== FIREBASE ==========
+    function escucharOrdenes() {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
+      const q = query(
+        collection(db, 'ordenesRestaurante'),
+        orderBy('fechaCreacion', 'desc')
+      );
+
+      onSnapshot(q, (snap) => {
+        ordenes = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(o => {
+            // Filtrar solo órdenes de hoy
+            const fecha = o.fechaCreacion?.toDate ? o.fechaCreacion.toDate() : new Date(o.fechaCreacion);
+            return fecha >= hoy;
+          });
+        render();
+      });
+    }
+
+    async function cargarCorteDia() {
+      const hoy = new Date().toISOString().slice(0, 10);
+      try {
+        const corteDoc = await getDoc(doc(db, 'cortesCaja', hoy));
+        if (corteDoc.exists()) {
+          const data = corteDoc.data();
+          corteCaja = data;
+          cajaAbierta = data.estado === 'abierta';
+          fondoInicial = data.fondoInicial || 0;
+        } else {
+          cajaAbierta = false;
+          fondoInicial = 0;
+        }
+      } catch (e) {
+        console.error('Error cargando corte:', e);
+      }
+    }
+
+    // ========== RENDER ==========
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (!usuario) {
+        app.innerHTML = renderLogin();
+        return;
+      }
+      
+      if (usuarioData && !ROLES_PERMITIDOS.includes(usuarioData.rol)) {
+        app.innerHTML = renderAccesoDenegado();
+        return;
+      }
+
+      // Si la caja no está abierta, mostrar pantalla de apertura
+      if (!cajaAbierta && vista !== 'historial') {
+        app.innerHTML = `
+          <div class="min-h-screen">
+            ${renderHeader()}
+            ${renderAperturaCaja()}
+          </div>
+        `;
+        return;
+      }
+
+      let contenido = '';
+      if (vista === 'ordenes') contenido = renderOrdenes();
+      else if (vista === 'corte') contenido = renderCorte();
+      else if (vista === 'historial') contenido = renderHistorial();
+
+      app.innerHTML = `
+        <div class="min-h-screen pb-4">
+          ${renderHeader()}
+          ${contenido}
+        </div>
+        ${ordenSeleccionada ? renderModalCobrar() : ''}
+      `;
+    }
+
+    function renderLogin() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center p-4">
+          <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl">
+            <div class="text-center mb-8">
+              <div class="text-5xl mb-3">💵</div>
+              <h1 class="text-2xl font-bold text-gray-800">Caja</h1>
+              <p class="text-gray-500">Jardín Escondido</p>
+            </div>
+            <div class="space-y-4">
+              <input id="email" type="email" placeholder="Correo electrónico" 
+                class="w-full p-4 bg-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+              <input id="password" type="password" placeholder="Contraseña" 
+                onkeypress="if(event.key==='Enter')iniciarSesion()"
+                class="w-full p-4 bg-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+              <button onclick="iniciarSesion()" 
+                class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-4 rounded-xl active:scale-95 transition-transform">
+                Entrar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAccesoDenegado() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center p-4">
+          <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center">
+            <div class="text-5xl mb-3">🚫</div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Acceso Denegado</h1>
+            <p class="text-gray-500 mb-4">Esta app es solo para cajeros y administradores.</p>
+            <div class="bg-gray-100 rounded-xl p-4 mb-6">
+              <p class="text-sm text-gray-600">Tu rol: <strong>${usuarioData?.rol || 'Sin rol'}</strong></p>
+            </div>
+            <button onclick="cerrarSesion()" class="text-gray-500 hover:text-gray-700">Cerrar sesión</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHeader() {
+      const horaEntrada = checadaHoy?.entrada || null;
+      const horaSalida = checadaHoy?.salida || null;
+      const ordenesListas = ordenes.filter(o => o.estado === 'listo').length;
+      const ordenesPorCobrar = ordenes.filter(o => !['pagado', 'cancelado'].includes(o.estado)).length;
+      
+      return `
+        <header class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 sticky top-0 z-40 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div>
+                <h1 class="font-bold text-xl">💵 Caja</h1>
+                <p class="text-emerald-200 text-sm">${usuarioData?.nombre || usuario?.email}</p>
+              </div>
+              ${cajaAbierta ? `
+                <div class="flex gap-2">
+                  <span class="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
+                    📋 ${ordenesPorCobrar} por cobrar
+                  </span>
+                  ${ordenesListas > 0 ? `
+                    <span class="px-3 py-1 bg-green-400 text-green-900 rounded-full text-sm font-medium pulse">
+                      ✅ ${ordenesListas} listas
+                    </span>
+                  ` : ''}
+                </div>
+              ` : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <!-- Checada -->
+              <button onclick="mostrarModalChecada()" 
+                class="px-3 py-2 rounded-xl flex items-center gap-1 text-sm font-medium ${horaEntrada ? (horaSalida ? 'bg-green-500' : 'bg-white/20') : 'bg-red-500 animate-pulse'}">
+                ${!horaEntrada ? '⏰ Entrada' : horaSalida ? '✅' : '🕐 ' + horaEntrada}
+              </button>
+              
+              <!-- Navegación -->
+              <div class="flex bg-white/10 rounded-xl p-1">
+                <button onclick="setVista('ordenes')" class="px-3 py-2 rounded-lg text-sm font-medium ${vista === 'ordenes' ? 'bg-white text-emerald-700' : 'hover:bg-white/10'}">
+                  🧾 Cobrar
+                </button>
+                <button onclick="setVista('corte')" class="px-3 py-2 rounded-lg text-sm font-medium ${vista === 'corte' ? 'bg-white text-emerald-700' : 'hover:bg-white/10'}">
+                  📊 Corte
+                </button>
+                <button onclick="setVista('historial')" class="px-3 py-2 rounded-lg text-sm font-medium ${vista === 'historial' ? 'bg-white text-emerald-700' : 'hover:bg-white/10'}">
+                  📜 Historial
+                </button>
+              </div>
+              
+              <button onclick="cerrarSesion()" class="p-2 hover:bg-white/20 rounded-xl">🚪</button>
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderAperturaCaja() {
+      return `
+        <div class="flex items-center justify-center min-h-[80vh] p-4">
+          <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-xl">
+            <div class="text-center mb-8">
+              <div class="text-6xl mb-4">🔐</div>
+              <h2 class="text-2xl font-bold text-gray-800">Apertura de Caja</h2>
+              <p class="text-gray-500">Ingresa el fondo inicial para comenzar</p>
+            </div>
+            
+            <div class="space-y-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Fondo Inicial</label>
+                <div class="relative">
+                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg">$</span>
+                  <input type="number" id="fondo-inicial" placeholder="0.00" step="0.01" min="0"
+                    class="w-full p-4 pl-10 text-2xl font-bold border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none" />
+                </div>
+              </div>
+              
+              <div class="bg-emerald-50 rounded-xl p-4">
+                <p class="text-sm text-emerald-800">
+                  <strong>📋 Recuerda:</strong> Cuenta el efectivo en caja antes de abrir. Este monto será tu referencia para el corte.
+                </p>
+              </div>
+              
+              <button onclick="abrirCaja()" 
+                class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-4 rounded-xl text-lg hover:from-emerald-600 hover:to-teal-600 transition-all">
+                🔓 Abrir Caja
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOrdenes() {
+      const porCobrar = ordenes.filter(o => !['pagado', 'cancelado'].includes(o.estado));
+      const listas = porCobrar.filter(o => o.estado === 'listo');
+      const enProceso = porCobrar.filter(o => o.estado !== 'listo');
+      
+      return `
+        <div class="p-4 space-y-6">
+          <!-- Órdenes Listas para Cobrar -->
+          ${listas.length > 0 ? `
+            <div>
+              <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                Listas para Cobrar (${listas.length})
+              </h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${listas.map(o => renderOrdenCard(o, true)).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          <!-- Órdenes en Proceso -->
+          ${enProceso.length > 0 ? `
+            <div>
+              <h2 class="text-lg font-bold text-gray-800 mb-3">En Proceso (${enProceso.length})</h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${enProceso.map(o => renderOrdenCard(o, false)).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          ${porCobrar.length === 0 ? `
+            <div class="bg-white rounded-2xl p-12 text-center">
+              <div class="text-6xl mb-4">✨</div>
+              <p class="text-xl text-gray-500">No hay órdenes pendientes</p>
+              <p class="text-gray-400 mt-2">Las nuevas órdenes aparecerán aquí</p>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderOrdenCard(orden, lista) {
+      const total = calcularTotalOrden(orden);
+      const items = obtenerItemsOrden(orden);
+      
+      return `
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden ${lista ? 'ring-2 ring-green-400' : ''}" onclick="seleccionarOrden('${orden.id}')">
+          <div class="p-4 ${lista ? 'bg-green-500 text-white' : 'bg-gray-100'}">
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="font-bold text-lg">${orden.mesa?.nombre || 'Sin mesa'}</p>
+                <p class="text-sm opacity-80">#${orden.numero || '---'}</p>
+              </div>
+              <div class="text-right">
+                <p class="font-bold text-xl">${fmt(total)}</p>
+                <p class="text-sm opacity-80">${fmtHora(orden.fechaCreacion)}</p>
+              </div>
+            </div>
+          </div>
+          <div class="p-4">
+            <div class="space-y-1 text-sm text-gray-600 max-h-24 overflow-y-auto">
+              ${items.slice(0, 4).map(i => `
+                <div class="flex justify-between">
+                  <span>${i.cantidad}x ${i.nombre}</span>
+                  <span>${fmt(i.precio * i.cantidad)}</span>
+                </div>
+              `).join('')}
+              ${items.length > 4 ? `<p class="text-gray-400">+ ${items.length - 4} más...</p>` : ''}
+            </div>
+            <div class="mt-4 flex justify-between items-center">
+              <span class="text-sm text-gray-500">Mesero: ${orden.meseroNombre || '-'}</span>
+              <span class="px-3 py-1 rounded-full text-xs font-medium ${
+                orden.estado === 'listo' ? 'bg-green-100 text-green-800' :
+                orden.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :
+                'bg-yellow-100 text-yellow-800'
+              }">${orden.estado}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderModalCobrar() {
+      const orden = ordenSeleccionada;
+      if (!orden) return '';
+      
+      const total = calcularTotalOrden(orden);
+      const items = obtenerItemsOrden(orden);
+      const metodoPago = window.metodoPago || 'efectivo';
+      const propina = window.propinaActual || 0;
+      const efectivoRecibido = window.efectivoRecibido || 0;
+      const totalConPropina = total + propina;
+      const cambio = efectivoRecibido - totalConPropina;
+      
+      return `
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="cerrarModalCobro()">
+          <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[95vh] overflow-auto" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-t-3xl sticky top-0">
+              <div class="flex justify-between items-center">
+                <div>
+                  <h2 class="text-xl font-bold">${orden.mesa?.nombre || 'Orden'} - #${orden.numero}</h2>
+                  <p class="text-emerald-200">${orden.meseroNombre || 'Sin mesero'}</p>
+                </div>
+                <button onclick="cerrarModalCobro()" class="p-2 hover:bg-white/20 rounded-xl text-2xl">✕</button>
+              </div>
+            </div>
+            
+            <div class="p-5 space-y-6">
+              <!-- Detalle de la orden -->
+              <div class="bg-gray-50 rounded-xl p-4">
+                <h3 class="font-semibold mb-3">Detalle de consumo</h3>
+                <div class="space-y-2 max-h-40 overflow-y-auto">
+                  ${items.map(i => `
+                    <div class="flex justify-between text-sm">
+                      <span>${i.cantidad}x ${i.nombre}</span>
+                      <span class="font-medium">${fmt(i.precio * i.cantidad)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="border-t mt-3 pt-3 flex justify-between font-bold text-lg">
+                  <span>Subtotal</span>
+                  <span>${fmt(total)}</span>
+                </div>
+              </div>
+              
+              <!-- Propina -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Propina (opcional)</label>
+                <div class="flex gap-2">
+                  <button onclick="setPropina(0)" class="flex-1 py-3 rounded-xl font-medium ${propina === 0 ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'}">Sin propina</button>
+                  <button onclick="setPropina(${Math.round(total * 0.10)})" class="flex-1 py-3 rounded-xl font-medium ${propina === Math.round(total * 0.10) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'}">10% (${fmt(total * 0.10)})</button>
+                  <button onclick="setPropina(${Math.round(total * 0.15)})" class="flex-1 py-3 rounded-xl font-medium ${propina === Math.round(total * 0.15) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'}">15% (${fmt(total * 0.15)})</button>
+                  <input type="number" placeholder="Otro" class="w-24 p-3 border rounded-xl text-center" 
+                    onchange="setPropina(parseFloat(this.value) || 0)" />
+                </div>
+              </div>
+              
+              <!-- Total -->
+              <div class="bg-emerald-50 rounded-xl p-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-lg">Total a Cobrar</span>
+                  <span class="text-3xl font-bold text-emerald-700">${fmt(totalConPropina)}</span>
+                </div>
+              </div>
+              
+              <!-- Método de pago -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
+                <div class="grid grid-cols-3 gap-2">
+                  <button onclick="setMetodoPago('efectivo')" class="py-4 rounded-xl font-medium flex flex-col items-center gap-1 ${metodoPago === 'efectivo' ? 'bg-emerald-600 text-white ring-2 ring-emerald-300' : 'bg-gray-100 text-gray-700'}">
+                    <span class="text-2xl">💵</span>
+                    <span>Efectivo</span>
+                  </button>
+                  <button onclick="setMetodoPago('tarjeta')" class="py-4 rounded-xl font-medium flex flex-col items-center gap-1 ${metodoPago === 'tarjeta' ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-gray-100 text-gray-700'}">
+                    <span class="text-2xl">💳</span>
+                    <span>Tarjeta</span>
+                  </button>
+                  <button onclick="setMetodoPago('transferencia')" class="py-4 rounded-xl font-medium flex flex-col items-center gap-1 ${metodoPago === 'transferencia' ? 'bg-purple-600 text-white ring-2 ring-purple-300' : 'bg-gray-100 text-gray-700'}">
+                    <span class="text-2xl">📱</span>
+                    <span>Transferencia</span>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Efectivo recibido (solo si es efectivo) -->
+              ${metodoPago === 'efectivo' ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Efectivo Recibido</label>
+                  <div class="flex gap-2 mb-3">
+                    ${[50, 100, 200, 500, 1000].map(monto => `
+                      <button onclick="setEfectivoRecibido(${monto})" class="flex-1 py-2 rounded-lg text-sm font-medium ${efectivoRecibido === monto ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-400' : 'bg-gray-100'}">${fmt(monto)}</button>
+                    `).join('')}
+                  </div>
+                  <input type="number" id="efectivo-input" placeholder="Cantidad recibida" value="${efectivoRecibido || ''}"
+                    onchange="setEfectivoRecibido(parseFloat(this.value) || 0)"
+                    class="w-full p-4 text-xl font-bold border-2 rounded-xl focus:border-emerald-500 outline-none" />
+                  ${efectivoRecibido >= totalConPropina ? `
+                    <div class="mt-3 p-4 bg-amber-50 rounded-xl flex justify-between items-center">
+                      <span class="text-amber-800 font-medium">Cambio:</span>
+                      <span class="text-2xl font-bold text-amber-600">${fmt(cambio)}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+              
+              <!-- Botones de acción -->
+              <div class="flex gap-3">
+                <button onclick="cerrarModalCobro()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-4 rounded-xl font-medium">
+                  Cancelar
+                </button>
+                <button onclick="procesarPago()" 
+                  class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-4 rounded-xl font-bold text-lg"
+                  ${metodoPago === 'efectivo' && efectivoRecibido < totalConPropina ? 'disabled style="opacity:0.5"' : ''}>
+                  ✅ Cobrar ${fmt(totalConPropina)}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCorte() {
+      const pagadas = ordenes.filter(o => o.estado === 'pagado');
+      const efectivo = pagadas.filter(o => o.metodoPago === 'efectivo').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const tarjeta = pagadas.filter(o => o.metodoPago === 'tarjeta').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const transferencia = pagadas.filter(o => o.metodoPago === 'transferencia').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const propinas = pagadas.reduce((s, o) => s + (o.propina || 0), 0);
+      const totalVentas = efectivo + tarjeta + transferencia;
+      const efectivoEnCaja = fondoInicial + efectivo;
+      
+      return `
+        <div class="p-4 space-y-6">
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+              📊 Corte de Caja
+              <span class="text-sm font-normal text-gray-500">${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            </h2>
+            
+            <!-- Resumen -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div class="bg-emerald-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Fondo Inicial</p>
+                <p class="text-2xl font-bold text-emerald-700">${fmt(fondoInicial)}</p>
+              </div>
+              <div class="bg-blue-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Total Ventas</p>
+                <p class="text-2xl font-bold text-blue-700">${fmt(totalVentas)}</p>
+              </div>
+              <div class="bg-amber-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Propinas</p>
+                <p class="text-2xl font-bold text-amber-700">${fmt(propinas)}</p>
+              </div>
+              <div class="bg-purple-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Ventas del Día</p>
+                <p class="text-2xl font-bold text-purple-700">${pagadas.length}</p>
+              </div>
+            </div>
+            
+            <!-- Desglose por método de pago -->
+            <div class="bg-gray-50 rounded-xl p-4 mb-6">
+              <h3 class="font-semibold mb-4">Desglose por Método de Pago</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="flex items-center gap-2"><span class="text-xl">💵</span> Efectivo</span>
+                  <span class="font-bold text-lg">${fmt(efectivo)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="flex items-center gap-2"><span class="text-xl">💳</span> Tarjeta</span>
+                  <span class="font-bold text-lg">${fmt(tarjeta)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="flex items-center gap-2"><span class="text-xl">📱</span> Transferencia</span>
+                  <span class="font-bold text-lg">${fmt(transferencia)}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Efectivo en caja -->
+            <div class="bg-emerald-100 rounded-xl p-6 mb-6">
+              <div class="flex justify-between items-center">
+                <div>
+                  <p class="text-emerald-800 font-medium">Efectivo que debe haber en caja:</p>
+                  <p class="text-sm text-emerald-600">Fondo inicial + ventas en efectivo</p>
+                </div>
+                <p class="text-4xl font-bold text-emerald-700">${fmt(efectivoEnCaja)}</p>
+              </div>
+            </div>
+            
+            <!-- Cierre de caja -->
+            <div class="border-t pt-6">
+              <h3 class="font-semibold mb-4">Cierre de Caja</h3>
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Efectivo contado</label>
+                  <input type="number" id="efectivo-contado" placeholder="0.00" step="0.01"
+                    class="w-full p-4 text-xl font-bold border-2 rounded-xl focus:border-emerald-500 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Diferencia</label>
+                  <div id="diferencia-corte" class="w-full p-4 text-xl font-bold bg-gray-100 rounded-xl">
+                    -
+                  </div>
+                </div>
+              </div>
+              <button onclick="cerrarCaja()" class="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold text-lg">
+                🔒 Cerrar Caja y Generar Corte
+              </button>
+            </div>
+          </div>
+          
+          <!-- Ventas del día -->
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h3 class="font-semibold mb-4">Ventas del Día (${pagadas.length})</h3>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+              ${pagadas.length === 0 ? `
+                <p class="text-gray-400 text-center py-4">No hay ventas registradas</p>
+              ` : pagadas.map(o => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p class="font-medium">${o.mesa?.nombre || 'Orden'} #${o.numero}</p>
+                    <p class="text-sm text-gray-500">${fmtHora(o.fechaPago || o.fechaCreacion)} - ${o.metodoPago || 'efectivo'}</p>
+                  </div>
+                  <p class="font-bold">${fmt(o.totalPagado || o.total)}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHistorial() {
+      return `
+        <div class="p-4">
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-6">📜 Historial de Cortes</h2>
+            <p class="text-gray-500 text-center py-8">Próximamente: Historial de cortes anteriores</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // ========== FUNCIONES DE UTILIDAD ==========
+    function calcularTotalOrden(orden) {
+      if (orden.tiempos && orden.tiempos.length > 0) {
+        return orden.tiempos.reduce((total, tiempo) => {
+          return total + tiempo.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+        }, 0);
+      }
+      return orden.items?.reduce((sum, item) => sum + (item.precio * item.cantidad), 0) || orden.total || 0;
+    }
+
+    function obtenerItemsOrden(orden) {
+      if (orden.tiempos && orden.tiempos.length > 0) {
+        const itemsMap = new Map();
+        orden.tiempos.forEach(tiempo => {
+          tiempo.items.forEach(item => {
+            const key = item.id || item.nombre;
+            if (itemsMap.has(key)) {
+              itemsMap.get(key).cantidad += item.cantidad;
+            } else {
+              itemsMap.set(key, { ...item });
+            }
+          });
+        });
+        return Array.from(itemsMap.values());
+      }
+      return orden.items || [];
+    }
+
+    // ========== FUNCIONES DE CAJA ==========
+    window.abrirCaja = async () => {
+      const fondo = parseFloat(document.getElementById('fondo-inicial').value) || 0;
+      
+      if (fondo < 0) {
+        alert('El fondo inicial no puede ser negativo');
+        return;
+      }
+      
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        await setDoc(doc(db, 'cortesCaja', hoy), {
+          fecha: hoy,
+          fondoInicial: fondo,
+          estado: 'abierta',
+          cajero: usuarioData?.nombre || usuario?.email,
+          cajeroId: usuario.uid,
+          horaApertura: new Date().toLocaleTimeString('es-MX'),
+          fechaApertura: serverTimestamp()
+        });
+        
+        fondoInicial = fondo;
+        cajaAbierta = true;
+        render();
+        
+        alert('✅ Caja abierta correctamente');
+      } catch (e) {
+        alert('Error al abrir caja: ' + e.message);
+      }
+    };
+
+    window.cerrarCaja = async () => {
+      const efectivoContado = parseFloat(document.getElementById('efectivo-contado').value) || 0;
+      const pagadas = ordenes.filter(o => o.estado === 'pagado');
+      const efectivo = pagadas.filter(o => o.metodoPago === 'efectivo').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const tarjeta = pagadas.filter(o => o.metodoPago === 'tarjeta').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const transferencia = pagadas.filter(o => o.metodoPago === 'transferencia').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const propinas = pagadas.reduce((s, o) => s + (o.propina || 0), 0);
+      const efectivoEsperado = fondoInicial + efectivo;
+      const diferencia = efectivoContado - efectivoEsperado;
+      
+      if (!confirm(`¿Cerrar caja?\n\nEfectivo esperado: ${fmt(efectivoEsperado)}\nEfectivo contado: ${fmt(efectivoContado)}\nDiferencia: ${fmt(diferencia)}`)) {
+        return;
+      }
+      
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        await updateDoc(doc(db, 'cortesCaja', hoy), {
+          estado: 'cerrada',
+          horaCierre: new Date().toLocaleTimeString('es-MX'),
+          fechaCierre: serverTimestamp(),
+          efectivoContado,
+          efectivoEsperado,
+          diferencia,
+          totalEfectivo: efectivo,
+          totalTarjeta: tarjeta,
+          totalTransferencia: transferencia,
+          totalPropinas: propinas,
+          totalVentas: efectivo + tarjeta + transferencia,
+          numeroVentas: pagadas.length
+        });
+        
+        cajaAbierta = false;
+        alert('✅ Caja cerrada correctamente\n\n' + 
+          `Total ventas: ${fmt(efectivo + tarjeta + transferencia)}\n` +
+          `Diferencia: ${fmt(diferencia)}`);
+        render();
+      } catch (e) {
+        alert('Error al cerrar caja: ' + e.message);
+      }
+    };
+
+    // ========== FUNCIONES DE COBRO ==========
+    window.seleccionarOrden = (id) => {
+      ordenSeleccionada = ordenes.find(o => o.id === id);
+      window.metodoPago = 'efectivo';
+      window.propinaActual = 0;
+      window.efectivoRecibido = 0;
+      render();
+    };
+
+    window.cerrarModalCobro = () => {
+      ordenSeleccionada = null;
+      render();
+    };
+
+    window.setMetodoPago = (metodo) => {
+      window.metodoPago = metodo;
+      render();
+    };
+
+    window.setPropina = (monto) => {
+      window.propinaActual = monto;
+      render();
+    };
+
+    window.setEfectivoRecibido = (monto) => {
+      window.efectivoRecibido = monto;
+      render();
+    };
+
+    window.procesarPago = async () => {
+      if (!ordenSeleccionada) return;
+      
+      const total = calcularTotalOrden(ordenSeleccionada);
+      const propina = window.propinaActual || 0;
+      const totalConPropina = total + propina;
+      const metodoPago = window.metodoPago || 'efectivo';
+      
+      try {
+        await updateDoc(doc(db, 'ordenesRestaurante', ordenSeleccionada.id), {
+          estado: 'pagado',
+          metodoPago,
+          propina,
+          totalPagado: totalConPropina,
+          fechaPago: serverTimestamp(),
+          cajero: usuarioData?.nombre || usuario?.email
+        });
+        
+        // Generar ticket
+        generarTicket(ordenSeleccionada, totalConPropina, propina, metodoPago);
+        
+        ordenSeleccionada = null;
+        render();
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      } catch (e) {
+        alert('Error al procesar pago: ' + e.message);
+      }
+    };
+
+    function generarTicket(orden, total, propina, metodoPago) {
+      const items = obtenerItemsOrden(orden);
+      const subtotal = total - propina;
+      const fecha = new Date();
+      
+      const ticketHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            @page { size: 80mm auto; margin: 0; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              width: 80mm;
+              padding: 4mm;
+              background: white;
+              color: black;
+            }
+            .header {
+              text-align: center;
+              padding-bottom: 8px;
+              border-bottom: 2px dashed #000;
+              margin-bottom: 8px;
+            }
+            .header .logo-img { width: 55mm; height: auto; margin-bottom: 5px; }
+            .subtitle { font-size: 10px; color: #333; }
+            .datetime { font-size: 10px; margin-top: 5px; }
+            
+            .order-info {
+              padding: 8px 0;
+              border-bottom: 1px dashed #000;
+            }
+            .order-info div {
+              display: flex;
+              justify-content: space-between;
+              padding: 2px 0;
+            }
+            
+            .items { padding: 8px 0; }
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 4px 0;
+              border-bottom: 1px dotted #ccc;
+            }
+            .item-name { flex: 1; }
+            .item-price { text-align: right; min-width: 70px; }
+            
+            .totals {
+              padding-top: 8px;
+              border-top: 2px dashed #000;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 4px 0;
+            }
+            .total-row.grand {
+              font-size: 16px;
+              font-weight: bold;
+              border-top: 1px solid #000;
+              margin-top: 5px;
+              padding-top: 8px;
+            }
+            
+            .payment-method {
+              text-align: center;
+              padding: 8px;
+              margin: 8px 0;
+              background: #f0f0f0;
+              font-weight: bold;
+            }
+            
+            .footer {
+              text-align: center;
+              padding-top: 10px;
+              border-top: 2px dashed #000;
+              margin-top: 10px;
+            }
+            .footer-msg { font-size: 11px; margin-bottom: 5px; }
+            .footer-small { font-size: 9px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <img src="${LOGO_TICKET}" alt="Jardín Escondido" class="logo-img">
+            <div class="datetime">
+              ${fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}<br>
+              ${fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+          
+          <div class="order-info">
+            <div>
+              <span>Mesa:</span>
+              <strong>${orden.mesa?.nombre || 'N/A'}</strong>
+            </div>
+            <div>
+              <span>Orden:</span>
+              <strong>#${orden.numero || '---'}</strong>
+            </div>
+            <div>
+              <span>Mesero:</span>
+              <span>${orden.meseroNombre || '-'}</span>
+            </div>
+            <div>
+              <span>Cajero:</span>
+              <span>${usuarioData?.nombre || usuario?.email?.split('@')[0] || '-'}</span>
+            </div>
+          </div>
+          
+          <div class="items">
+            ${items.map(i => `
+              <div class="item-row">
+                <span class="item-name">${i.cantidad}x ${i.nombre}</span>
+                <span class="item-price">$${(i.precio * i.cantidad).toFixed(2)}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="totals">
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <span>$${subtotal.toFixed(2)}</span>
+            </div>
+            ${propina > 0 ? `
+              <div class="total-row">
+                <span>Propina:</span>
+                <span>$${propina.toFixed(2)}</span>
+              </div>
+            ` : ''}
+            <div class="total-row grand">
+              <span>TOTAL:</span>
+              <span>$${total.toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div class="payment-method">
+            ${metodoPago === 'efectivo' ? '💵' : metodoPago === 'tarjeta' ? '💳' : '📱'} 
+            PAGADO CON ${metodoPago.toUpperCase()}
+          </div>
+          
+          <div class="footer">
+            <div class="footer-msg">¡Gracias por su visita!</div>
+            <div class="footer-msg">Vuelva pronto 🌿</div>
+            <div class="footer-small">
+              <br>Jardín Escondido<br>
+              Tel: 55 1234 5678
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Preguntar si desea imprimir
+      if (confirm('¿Imprimir ticket de venta?')) {
+        // Usar iframe oculto para imprimir
+        let iframe = document.getElementById('print-iframe');
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.id = 'print-iframe';
+          iframe.style.cssText = 'position: fixed; right: 0; bottom: 0; width: 0; height: 0; border: 0;';
+          document.body.appendChild(iframe);
+        }
+        
+        const iframeDoc = iframe.contentWindow || iframe.contentDocument;
+        const doc = iframeDoc.document || iframeDoc;
+        
+        doc.open();
+        doc.write(ticketHTML);
+        doc.close();
+        
+        iframe.onload = () => {
+          setTimeout(() => {
+            try {
+              iframe.contentWindow.focus();
+              iframe.contentWindow.print();
+            } catch (e) {
+              const ventana = window.open('', '_blank', 'width=350,height=600');
+              if (ventana) {
+                ventana.document.write(ticketHTML);
+                ventana.document.close();
+                ventana.onload = () => ventana.print();
+              }
+            }
+          }, 300);
+        };
+      }
+    }
+
+    // ========== CHECADA ==========
+    async function cargarChecadaHoy() {
+      if (!usuario?.uid) return;
+      
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        const q = query(
+          collection(db, 'checadas'),
+          where('empleadoId', '==', usuario.uid),
+          where('fecha', '==', hoy)
+        );
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          checadaHoy = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        } else {
+          checadaHoy = null;
+        }
+      } catch (e) {
+        console.error('Error cargando checada:', e);
+      }
+    }
+
+    window.mostrarModalChecada = () => {
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      
+      const modal = document.createElement('div');
+      modal.id = 'modal-checada';
+      modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      
+      modal.innerHTML = `
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm">
+          <div class="text-center mb-6">
+            <div class="text-5xl mb-2">⏰</div>
+            <h2 class="text-xl font-bold">Control de Asistencia</h2>
+            <p class="text-gray-500">${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          </div>
+          
+          ${checadaHoy ? `
+            <div class="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Entrada:</span>
+                <span class="font-bold text-green-600">${checadaHoy.entrada || '-'}</span>
+              </div>
+              ${checadaHoy.salida ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Salida:</span>
+                  <span class="font-bold text-blue-600">${checadaHoy.salida}</span>
+                </div>
+              ` : ''}
+            </div>
+          ` : `
+            <div class="bg-yellow-50 rounded-xl p-4 mb-4 text-center">
+              <p class="text-yellow-800">No has registrado tu entrada hoy</p>
+            </div>
+          `}
+          
+          <div class="space-y-3">
+            ${!checadaHoy ? `
+              <button onclick="registrarEntrada()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl">
+                ✅ Registrar Entrada (${horaActual})
+              </button>
+            ` : !checadaHoy.salida ? `
+              <button onclick="registrarSalida()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-xl">
+                🚪 Registrar Salida (${horaActual})
+              </button>
+            ` : `
+              <div class="text-center text-green-600 font-semibold py-4">
+                ✅ Jornada completada
+              </div>
+            `}
+            <button onclick="document.getElementById('modal-checada').remove()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 rounded-xl">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    };
+
+    window.registrarEntrada = async () => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        const docRef = await addDoc(collection(db, 'checadas'), {
+          empleadoId: usuario.uid,
+          empleadoNombre: usuarioData?.nombre || usuario?.email?.split('@')[0] || 'Cajero',
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null,
+          app: 'cajero',
+          fechaCreacion: serverTimestamp()
+        });
+        
+        checadaHoy = {
+          id: docRef.id,
+          empleadoId: usuario.uid,
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null
+        };
+        
+        document.getElementById('modal-checada')?.remove();
+        render();
+        alert('✅ Entrada registrada: ' + horaActual);
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    };
+
+    window.registrarSalida = async () => {
+      if (!checadaHoy?.id) return;
+      
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        await updateDoc(doc(db, 'checadas', checadaHoy.id), {
+          salida: horaActual,
+          fechaSalida: serverTimestamp()
+        });
+        
+        checadaHoy.salida = horaActual;
+        
+        document.getElementById('modal-checada')?.remove();
+        render();
+        alert('✅ Salida registrada: ' + horaActual);
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    };
+
+    // ========== AUTH ==========
+    window.iniciarSesion = async () => {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      
+      if (!email || !password) {
+        alert('Ingresa correo y contraseña');
+        return;
+      }
+      
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        const errores = {
+          'auth/invalid-email': 'Correo no válido',
+          'auth/wrong-password': 'Contraseña incorrecta',
+          'auth/user-not-found': 'Usuario no encontrado'
+        };
+        alert(errores[e.code] || 'Error: ' + e.message);
+      }
+    };
+
+    window.cerrarSesion = async () => {
+      if (confirm('¿Cerrar sesión?')) {
+        await signOut(auth);
+      }
+    };
+
+    window.setVista = (v) => { vista = v; render(); };
+
+    // ========== INIT ==========
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        usuario = { uid: user.uid, email: user.email };
+        
+        try {
+          const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+          if (userDoc.exists()) {
+            usuarioData = userDoc.data();
+          } else {
+            usuarioData = { rol: 'cajero' };
+          }
+        } catch (e) {
+          usuarioData = { rol: 'cajero' };
+        }
+        
+        if (ROLES_PERMITIDOS.includes(usuarioData?.rol)) {
+          escucharOrdenes();
+          await cargarCorteDia();
+          await cargarChecadaHoy();
+        }
+      } else {
+        usuario = null;
+        usuarioData = null;
+        ordenes = [];
+        checadaHoy = null;
+        cajaAbierta = false;
+      }
+      render();
+    });
+
+    // Actualizar diferencia en tiempo real
+    document.addEventListener('input', (e) => {
+      if (e.target.id === 'efectivo-contado') {
+        const contado = parseFloat(e.target.value) || 0;
+        const pagadas = ordenes.filter(o => o.estado === 'pagado');
+        const efectivo = pagadas.filter(o => o.metodoPago === 'efectivo').reduce((s, o) => s + (o.totalPagado || 0), 0);
+        const esperado = fondoInicial + efectivo;
+        const diferencia = contado - esperado;
+        
+        const divDif = document.getElementById('diferencia-corte');
+        if (divDif) {
+          divDif.textContent = fmt(diferencia);
+          divDif.className = `w-full p-4 text-xl font-bold rounded-xl ${
+            diferencia === 0 ? 'bg-green-100 text-green-700' :
+            diferencia > 0 ? 'bg-blue-100 text-blue-700' :
+            'bg-red-100 text-red-700'
+          }`;
+        }
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

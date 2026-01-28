@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>👨‍🍳 Cocina - Jardín Escondido</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    .slide-in { animation: slideIn 0.3s ease-out; }
+    .pulse { animation: pulse 2s infinite; }
+    .shake { animation: shake 0.5s ease-in-out infinite; }
+    @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(15deg); } 75% { transform: rotate(-15deg); } }
+    .ring { animation: ring 0.5s ease-in-out infinite; }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 5px #22c55e, 0 0 10px #22c55e; } 50% { box-shadow: 0 0 20px #22c55e, 0 0 30px #22c55e; } }
+    .glow-green { animation: glow 1s ease-in-out infinite; }
+    
+    @media print {
+      body * { visibility: hidden; }
+      #ticket-print, #ticket-print * { visibility: visible; }
+      #ticket-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm;
+        padding: 5mm;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #000;
+        background: #fff;
+      }
+      @page {
+        size: 80mm auto;
+        margin: 0;
+      }
+    }
+    
+    .ticket-preview {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-white">
+  <div id="app">
+    <div class="min-h-screen flex items-center justify-center">
+      <div class="text-center">
+        <div class="text-6xl mb-4">👨‍🍳</div>
+        <p class="text-lg">Conectando con cocina...</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="ticket-print" class="hidden"></div>
+
+  <audio id="notifSound" preload="auto">
+    <!-- Sonido de campana/alerta más fuerte -->
+    <source src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAEAAABVgANTU1NTU1NTU1NVVVVVVVVVVVVXBwcHBwcHBwcHCLi4uLi4uLi4uLpaWlpaWlpaWlwMDAwMDAwMDAwNra2tra2tra2tr09PT09PT09PT0//////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAVhEuEAhAAAAAAD/4xjEABcAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjEDx4Aa8YBQBAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxAUQ6DrUAUAQAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/jGMQPEAADSAAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=" type="audio/mp3">
+  </audio>
+  
+  <!-- Sonido alternativo con Web Audio API -->
+  <script>
+    // Crear sonido de alerta con Web Audio API (más confiable)
+    let audioContext = null;
+    
+    function crearSonidoAlerta() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 880; // Nota A5
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+      
+      // Segundo tono
+      setTimeout(() => {
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioContext.destination);
+        osc2.frequency.value = 1100; // Nota más alta
+        osc2.type = 'sine';
+        gain2.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        osc2.start(audioContext.currentTime);
+        osc2.stop(audioContext.currentTime + 0.5);
+      }, 200);
+      
+      // Tercer tono
+      setTimeout(() => {
+        const osc3 = audioContext.createOscillator();
+        const gain3 = audioContext.createGain();
+        osc3.connect(gain3);
+        gain3.connect(audioContext.destination);
+        osc3.frequency.value = 1320; // Nota aún más alta
+        osc3.type = 'sine';
+        gain3.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.7);
+        osc3.start(audioContext.currentTime);
+        osc3.stop(audioContext.currentTime + 0.7);
+      }, 400);
+    }
+    
+    window.reproducirAlerta = crearSonidoAlerta;
+  </script>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { getFirestore, collection, doc, getDoc, addDoc, onSnapshot, query, orderBy, where, updateDoc, deleteDoc, getDocs, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAVB0cuMbczpdp1EXWZZaXV2uEoW0LiYPo",
+      authDomain: "jardin-escondido.firebaseapp.com",
+      projectId: "jardin-escondido",
+      storageBucket: "jardin-escondido.firebasestorage.app",
+      messagingSenderId: "41075573711",
+      appId: "1:41075573711:web:1566bc05ec7048d4fa48ba"
+    };
+
+    const appFB = initializeApp(firebaseConfig);
+    const auth = getAuth(appFB);
+    const db = getFirestore(appFB, 'jardin-escondido-db');
+
+    // ========== ESTADO ==========
+    let usuario = null;
+    let usuarioData = null;
+    let ordenes = [];
+    let ordenSeleccionada = null;
+    let vista = 'cocina'; // cocina, historial, admin
+    let sonidoActivo = true;
+    let ordenesAnteriores = new Set();
+    let checadaHoy = null; // Checada del día actual
+    let empleadosCocina = []; // Empleados del área de cocina
+    let checadasHoy = []; // Checadas de todos los empleados de cocina
+
+    // Roles permitidos para esta app
+    const ROLES_PERMITIDOS = ['admin', 'cocina'];
+    
+    // Logo para tickets (escala de grises)
+    const LOGO_TICKET = 'data:image/jpeg;base64,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';
+    
+    // Puestos de cocina
+    const PUESTOS_COCINA = ['chef', 'cocinero', 'ayudante-cocina'];
+
+    // ========== UTILIDADES ==========
+    const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+    const tiempoTranscurrido = (fecha) => {
+      if (!fecha) return '-';
+      const ahora = new Date();
+      const creacion = fecha.toDate ? fecha.toDate() : new Date(fecha);
+      const mins = Math.floor((ahora - creacion) / 60000);
+      if (mins < 1) return 'Ahora';
+      if (mins < 60) return `${mins} min`;
+      return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    };
+
+    // ========== FIREBASE ==========
+    function escucharOrdenes() {
+      // Query simple sin filtros complejos para evitar problemas de índice
+      const q = query(
+        collection(db, 'ordenesRestaurante'),
+        orderBy('fechaCreacion', 'desc')
+      );
+
+      onSnapshot(q, (snap) => {
+        const nuevasOrdenes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Detectar órdenes nuevas o nuevos tiempos para notificar
+        nuevasOrdenes.forEach(o => {
+          const tieneNuevoPendiente = o.estado === 'pendiente' || 
+            (o.tiempos && o.tiempos.some(t => t.estado === 'pendiente'));
+          
+          if (tieneNuevoPendiente && !ordenesAnteriores.has(o.id + '-' + (o.ultimoTiempo || 1))) {
+            if (ordenesAnteriores.size > 0 && sonidoActivo) {
+              reproducirSonido();
+              mostrarNotificacion(o);
+            }
+            ordenesAnteriores.add(o.id + '-' + (o.ultimoTiempo || 1));
+          }
+        });
+
+        ordenes = nuevasOrdenes;
+        render();
+      }, (error) => {
+        console.log('Error en query, intentando sin orderBy:', error);
+        // Si falla, intentar query simple
+        onSnapshot(collection(db, 'ordenesRestaurante'), (snap) => {
+          ordenes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          ordenes.sort((a, b) => {
+            const fechaA = a.fechaCreacion?.toDate?.() || new Date(0);
+            const fechaB = b.fechaCreacion?.toDate?.() || new Date(0);
+            return fechaB - fechaA;
+          });
+          render();
+        });
+      });
+    }
+
+    function reproducirSonido() {
+      try {
+        // Intentar con Web Audio API primero (más confiable)
+        if (window.reproducirAlerta) {
+          window.reproducirAlerta();
+        } else {
+          // Fallback al elemento audio
+          const audio = document.getElementById('notifSound');
+          audio.currentTime = 0;
+          audio.volume = 1.0;
+          audio.play().catch(() => {});
+        }
+      } catch (e) {
+        console.log('Error reproduciendo sonido:', e);
+      }
+    }
+
+    function mostrarNotificacion(orden) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🍽️ Nueva Orden / Tiempo', {
+          body: `${orden.mesa?.nombre} - ${orden.tiempos?.length || 1} tiempo(s)`,
+          icon: '👨‍🍳'
+        });
+      }
+    }
+
+    async function cambiarEstado(ordenId, nuevoEstado) {
+      try {
+        const updates = {
+          estado: nuevoEstado,
+          fechaActualizacion: serverTimestamp()
+        };
+
+        if (nuevoEstado === 'preparando') {
+          updates.fechaInicio = serverTimestamp();
+        } else if (nuevoEstado === 'listo') {
+          updates.fechaListo = serverTimestamp();
+        }
+
+        await updateDoc(doc(db, 'ordenesRestaurante', ordenId), updates);
+      } catch (e) {
+        console.error('Error:', e);
+        alert('Error al actualizar orden');
+      }
+    }
+
+    async function eliminarOrden(ordenId) {
+      if (!confirm('¿Eliminar esta orden? Esta acción no se puede deshacer.')) return;
+      try {
+        await deleteDoc(doc(db, 'ordenesRestaurante', ordenId));
+        alert('✅ Orden eliminada');
+      } catch (e) {
+        console.error('Error:', e);
+        alert('Error al eliminar');
+      }
+    }
+
+    async function eliminarTodasLasOrdenes() {
+      if (!confirm('⚠️ ¿ELIMINAR TODAS LAS ÓRDENES?\n\nEsta acción eliminará TODAS las órdenes de prueba y no se puede deshacer.')) return;
+      if (!confirm('¿Estás SEGURO? Escribe "SI" para confirmar')) return;
+      
+      try {
+        const snap = await getDocs(collection(db, 'ordenesRestaurante'));
+        let count = 0;
+        for (const docSnap of snap.docs) {
+          await deleteDoc(doc(db, 'ordenesRestaurante', docSnap.id));
+          count++;
+        }
+        alert(`✅ Se eliminaron ${count} órdenes`);
+      } catch (e) {
+        console.error('Error:', e);
+        alert('Error al eliminar: ' + e.message);
+      }
+    }
+
+    // ========== IMPRESIÓN ==========
+    function generarTicket(orden) {
+      const fecha = orden.fechaCreacion?.toDate ? orden.fechaCreacion.toDate() : new Date();
+      
+      // Combinar todos los items de todos los tiempos
+      const todosLosItems = [];
+      if (orden.tiempos && orden.tiempos.length > 0) {
+        orden.tiempos.forEach((tiempo, idx) => {
+          todosLosItems.push({ tipo: 'header', texto: `═══ TIEMPO ${tiempo.numero} ═══` });
+          tiempo.items.forEach(item => {
+            todosLosItems.push({ tipo: 'item', ...item });
+          });
+          if (tiempo.notas) {
+            todosLosItems.push({ tipo: 'nota', texto: tiempo.notas });
+          }
+        });
+      } else if (orden.items) {
+        orden.items.forEach(item => {
+          todosLosItems.push({ tipo: 'item', ...item });
+        });
+      }
+      
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              width: 80mm;
+              padding: 3mm;
+              background: white;
+              color: black;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 8px;
+              margin-bottom: 8px;
+            }
+            .header .logo { width: 55mm; height: auto; margin-bottom: 5px; }
+            .title { font-size: 18px; font-weight: bold; }
+            .subtitle { font-size: 11px; }
+            .order-number {
+              text-align: center;
+              font-size: 36px;
+              font-weight: bold;
+              margin: 10px 0;
+              letter-spacing: 2px;
+            }
+            .mesa-box {
+              text-align: center;
+              background: #000;
+              color: #fff;
+              padding: 8px;
+              font-size: 20px;
+              font-weight: bold;
+              margin: 8px 0;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 3px 0;
+              border-bottom: 1px dotted #ccc;
+            }
+            .divider {
+              border-top: 2px dashed #000;
+              margin: 10px 0;
+            }
+            .time-header {
+              text-align: center;
+              font-weight: bold;
+              padding: 8px 0;
+              margin: 5px 0;
+              background: #f0f0f0;
+              border: 1px solid #000;
+            }
+            .item-row {
+              padding: 6px 0;
+              border-bottom: 1px dotted #ccc;
+              display: flex;
+              align-items: flex-start;
+            }
+            .item-qty {
+              font-weight: bold;
+              font-size: 16px;
+              min-width: 35px;
+            }
+            .item-name {
+              font-size: 14px;
+              flex: 1;
+            }
+            .nota-box {
+              background: #f5f5f5;
+              border-left: 3px solid #000;
+              padding: 5px 8px;
+              margin: 5px 0;
+              font-size: 11px;
+            }
+            .nota-general {
+              border: 2px solid #000;
+              padding: 8px;
+              margin: 10px 0;
+              text-align: center;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              padding-top: 10px;
+              border-top: 2px dashed #000;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <img src="${LOGO_TICKET}" alt="Jardín Escondido" class="logo">
+            <div class="title">🍽️ COMANDA COCINA</div>
+          </div>
+          
+          <div class="order-number">#${orden.numero || '---'}</div>
+          
+          <div class="mesa-box">${orden.mesa?.nombre || 'MESA'}</div>
+          
+          <div class="info-row">
+            <span>Mesero:</span>
+            <span><strong>${orden.meseroNombre || '-'}</strong></span>
+          </div>
+          <div class="info-row">
+            <span>Hora:</span>
+            <span><strong>${fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</strong></span>
+          </div>
+          <div class="info-row">
+            <span>Tiempos:</span>
+            <span><strong>${orden.tiempos?.length || 1}</strong></span>
+          </div>
+          
+          <div class="divider"></div>
+          
+          ${todosLosItems.map(item => {
+            if (item.tipo === 'header') {
+              return `<div class="time-header">${item.texto}</div>`;
+            } else if (item.tipo === 'nota') {
+              return `<div class="nota-box">📝 ${item.texto}</div>`;
+            } else {
+              return `
+                <div class="item-row">
+                  <span class="item-qty">${item.cantidad}x</span>
+                  <span class="item-name">${item.nombre}</span>
+                </div>
+              `;
+            }
+          }).join('')}
+          
+          ${orden.notas ? `
+            <div class="nota-general">
+              <strong>📝 NOTA IMPORTANTE:</strong><br>
+              ${orden.notas}
+            </div>
+          ` : ''}
+          
+          <div class="footer">
+            <div>${fecha.toLocaleDateString('es-MX')}</div>
+            <div style="margin-top: 5px;">• • •</div>
+          </div>
+        </body>
+        </html>
+      `;
+    }
+
+    function imprimirTicket(orden) {
+      const ticketHTML = generarTicket(orden);
+      
+      // Usar iframe oculto para imprimir
+      let iframe = document.getElementById('print-iframe');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'print-iframe';
+        iframe.style.cssText = 'position: fixed; right: 0; bottom: 0; width: 0; height: 0; border: 0;';
+        document.body.appendChild(iframe);
+      }
+      
+      const iframeDoc = iframe.contentWindow || iframe.contentDocument;
+      const doc = iframeDoc.document || iframeDoc;
+      
+      doc.open();
+      doc.write(ticketHTML);
+      doc.close();
+      
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          } catch (e) {
+            // Fallback: ventana emergente
+            const ventana = window.open('', '_blank', 'width=350,height=600');
+            if (ventana) {
+              ventana.document.write(ticketHTML);
+              ventana.document.close();
+              ventana.onload = () => ventana.print();
+            } else {
+              alert('Permite las ventanas emergentes para imprimir');
+            }
+          }
+        }, 300);
+      };
+    }
+
+    // ========== RENDER ==========
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (!usuario) {
+        app.innerHTML = renderLogin();
+        return;
+      }
+      
+      // Verificar si tiene permiso
+      if (usuarioData && !ROLES_PERMITIDOS.includes(usuarioData.rol)) {
+        app.innerHTML = renderAccesoDenegado();
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="min-h-screen">
+          ${renderHeader()}
+          ${vista === 'cocina' ? renderCocina() : vista === 'historial' ? renderHistorial() : renderAdmin()}
+          ${renderModalDetalle()}
+        </div>
+      `;
+    }
+
+    function renderAccesoDenegado() {
+      return `
+        <div class="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+          <div class="bg-gray-800 rounded-3xl p-8 w-full max-w-sm text-center">
+            <div class="text-5xl mb-3">🚫</div>
+            <h1 class="text-2xl font-bold text-white mb-2">Acceso Denegado</h1>
+            <p class="text-gray-400 mb-4">Esta pantalla es solo para cocina y administradores.</p>
+            <div class="bg-gray-700 rounded-xl p-4 mb-6">
+              <p class="text-sm text-gray-400">Tu rol: <strong class="text-white">${usuarioData?.rol || 'Sin rol'}</strong></p>
+            </div>
+            <button onclick="cerrarSesion()" class="text-gray-400 hover:text-white">Cerrar sesión</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLogin() {
+      return `
+        <div class="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+          <div class="bg-gray-800 rounded-3xl p-8 w-full max-w-sm">
+            <div class="text-center mb-8">
+              <div class="text-5xl mb-3">👨‍🍳</div>
+              <h1 class="text-2xl font-bold">Pantalla Cocina</h1>
+              <p class="text-gray-400">Jardín Escondido</p>
+            </div>
+            <div class="space-y-4">
+              <input id="email" type="email" placeholder="Correo electrónico" 
+                class="w-full p-4 bg-gray-700 rounded-xl text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-500" />
+              <input id="password" type="password" placeholder="Contraseña" 
+                class="w-full p-4 bg-gray-700 rounded-xl text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-500" />
+              <button onclick="iniciarSesion()" 
+                class="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold py-4 rounded-xl transition-colors">
+                Entrar a Cocina
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHeader() {
+      const pendientes = ordenes.filter(o => o.estado === 'pendiente').length;
+      const preparando = ordenes.filter(o => o.estado === 'preparando').length;
+      
+      // Contar empleados checados
+      const empleadosConEntrada = checadasHoy.filter(c => c.entrada && !c.salida).length;
+      const empleadosCompletos = checadasHoy.filter(c => c.entrada && c.salida).length;
+      const totalEmpleados = empleadosCocina.length;
+      
+      return `
+        <header class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-40">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <h1 class="text-2xl font-bold">👨‍🍳 Cocina</h1>
+              <div class="flex gap-2">
+                <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm font-medium ${pendientes > 0 ? 'ring' : ''}">
+                  ⏳ ${pendientes} pendientes
+                </span>
+                <span class="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-medium">
+                  👨‍🍳 ${preparando} preparando
+                </span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <!-- Botón de Checada Multi-empleado -->
+              <button onclick="mostrarModalChecada()" 
+                class="px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium ${
+                  empleadosConEntrada === 0 && empleadosCompletos === 0 ? 'bg-red-500 animate-pulse' : 
+                  empleadosConEntrada > 0 ? 'bg-green-600' : 'bg-gray-700'
+                }">
+                ⏰ Asistencia
+                ${totalEmpleados > 0 ? `<span class="bg-white/20 px-2 py-0.5 rounded-full text-xs">${empleadosConEntrada + empleadosCompletos}/${totalEmpleados}</span>` : ''}
+              </button>
+              <button onclick="setVista('cocina')" class="px-4 py-2 rounded-xl ${vista === 'cocina' ? 'bg-amber-500 text-black' : 'bg-gray-700'} font-medium">
+                🍳 Cocina
+              </button>
+              <button onclick="setVista('historial')" class="px-4 py-2 rounded-xl ${vista === 'historial' ? 'bg-amber-500 text-black' : 'bg-gray-700'} font-medium">
+                📋 Historial
+              </button>
+              <button onclick="setVista('admin')" class="px-4 py-2 rounded-xl ${vista === 'admin' ? 'bg-red-500 text-white' : 'bg-gray-700'} font-medium">
+                ⚙️ Admin
+              </button>
+              <div class="flex items-center gap-1 bg-gray-700 rounded-xl p-1">
+                <button onclick="toggleSonido()" class="px-3 py-2 rounded-lg ${sonidoActivo ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-400'}" title="${sonidoActivo ? 'Sonido activado' : 'Sonido desactivado'}">
+                  ${sonidoActivo ? '🔔' : '🔕'}
+                </button>
+                <button onclick="probarSonido()" class="px-3 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 text-white" title="Probar sonido">
+                  🔊
+                </button>
+              </div>
+              <button onclick="cerrarSesion()" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-xl">
+                🚪
+              </button>
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderCocina() {
+      const activas = ordenes.filter(o => !['pagado', 'cancelado', 'entregado'].includes(o.estado));
+      
+      if (activas.length === 0) {
+        return `
+          <div class="flex items-center justify-center h-[80vh]">
+            <div class="text-center">
+              <div class="text-8xl mb-4">✨</div>
+              <p class="text-2xl text-gray-400">Sin órdenes pendientes</p>
+              <p class="text-gray-500">Las órdenes aparecerán aquí automáticamente</p>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          ${activas.map(o => {
+            const tiemposPendientes = (o.tiempos || []).filter(t => t.estado === 'pendiente').length;
+            const urgente = tiempoTranscurrido(o.fechaCreacion).includes('h') || 
+                           parseInt(tiempoTranscurrido(o.fechaCreacion)) > 15;
+            
+            return `
+              <div class="slide-in bg-gray-800 rounded-2xl overflow-hidden ${
+                o.estado === 'listo' ? 'ring-4 ring-green-500 glow-green' : 
+                o.estado === 'preparando' ? 'ring-2 ring-blue-500' : 
+                urgente ? 'ring-2 ring-red-500 shake' : ''
+              }">
+                <!-- Header de la orden -->
+                <div class="p-4 ${
+                  o.estado === 'listo' ? 'bg-green-500' : 
+                  o.estado === 'preparando' ? 'bg-blue-500' : 
+                  'bg-yellow-500'
+                } text-black">
+                  <div class="flex justify-between items-start">
+                    <div>
+                      <p class="text-3xl font-black">#${o.numero}</p>
+                      <p class="text-xl font-bold">${o.mesa?.nombre}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="font-bold">${tiempoTranscurrido(o.fechaCreacion)}</p>
+                      <p class="text-sm opacity-75">${o.tiempos?.length || 1} tiempo(s)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Items por tiempo -->
+                <div class="p-4 max-h-64 overflow-y-auto">
+                  ${(o.tiempos && o.tiempos.length > 0) ? o.tiempos.map((tiempo, idx) => `
+                    <div class="mb-3 ${idx > 0 ? 'border-t border-gray-700 pt-3' : ''}">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold ${tiempo.estado === 'pendiente' ? 'text-yellow-400' : 'text-green-400'}">
+                          ⏱️ TIEMPO ${tiempo.numero}
+                        </span>
+                        <span class="text-xs text-gray-500">
+                          ${new Date(tiempo.hora).toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit'})}
+                        </span>
+                      </div>
+                      ${tiempo.items.map(i => `
+                        <div class="flex items-center gap-2 py-1">
+                          <span class="w-8 h-8 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-lg">${i.cantidad}</span>
+                          <span class="font-medium">${i.nombre}</span>
+                        </div>
+                      `).join('')}
+                      ${tiempo.notas ? `<p class="text-xs text-amber-400 mt-2 bg-amber-500/10 p-2 rounded">📝 ${tiempo.notas}</p>` : ''}
+                    </div>
+                  `).join('') : `
+                    ${(o.items || []).map(i => `
+                      <div class="flex items-center gap-2 py-1">
+                        <span class="w-8 h-8 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-lg">${i.cantidad}</span>
+                        <span class="font-medium">${i.nombre}</span>
+                      </div>
+                    `).join('')}
+                    ${o.notas ? `<p class="text-xs text-amber-400 mt-2 bg-amber-500/10 p-2 rounded">📝 ${o.notas}</p>` : ''}
+                  `}
+                </div>
+
+                <!-- Info mesero -->
+                <div class="px-4 py-2 bg-gray-700/50 text-sm text-gray-400">
+                  👤 ${o.meseroNombre || 'Mesero'}
+                </div>
+
+                <!-- Acciones -->
+                <div class="p-3 bg-gray-900 flex gap-2">
+                  <button onclick="verDetalle('${o.id}')" class="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-xl font-medium">
+                    👁️ Ver
+                  </button>
+                  ${o.estado === 'pendiente' ? `
+                    <button onclick="iniciarPreparacion('${o.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold">
+                      👨‍🍳 Iniciar
+                    </button>
+                  ` : o.estado === 'preparando' ? `
+                    <button onclick="marcarListo('${o.id}')" class="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded-xl font-bold">
+                      ✅ ¡Listo!
+                    </button>
+                  ` : `
+                    <button class="flex-1 bg-green-500 py-3 rounded-xl font-bold text-black cursor-default">
+                      🎉 LISTO
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderHistorial() {
+      const historial = ordenes.filter(o => ['pagado', 'entregado', 'cancelado'].includes(o.estado)).slice(0, 50);
+      
+      return `
+        <div class="p-6">
+          <h2 class="text-2xl font-bold mb-6">📋 Historial de Órdenes</h2>
+          
+          ${historial.length === 0 ? `
+            <div class="text-center text-gray-400 py-12">
+              <p class="text-4xl mb-2">📋</p>
+              <p>Sin historial</p>
+            </div>
+          ` : `
+            <div class="bg-gray-800 rounded-2xl overflow-hidden">
+              <table class="w-full">
+                <thead class="bg-gray-700">
+                  <tr>
+                    <th class="px-4 py-3 text-left">Orden</th>
+                    <th class="px-4 py-3 text-left">Mesa</th>
+                    <th class="px-4 py-3 text-left">Mesero</th>
+                    <th class="px-4 py-3 text-left">Tiempos</th>
+                    <th class="px-4 py-3 text-left">Total</th>
+                    <th class="px-4 py-3 text-left">Estado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                  ${historial.map(o => `
+                    <tr class="hover:bg-gray-700/50">
+                      <td class="px-4 py-3 font-bold">#${o.numero}</td>
+                      <td class="px-4 py-3">${o.mesa?.nombre || '-'}</td>
+                      <td class="px-4 py-3">${o.meseroNombre || '-'}</td>
+                      <td class="px-4 py-3">${o.tiempos?.length || 1}</td>
+                      <td class="px-4 py-3 font-semibold">${fmt(o.total)}</td>
+                      <td class="px-4 py-3">
+                        <span class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
+                          ✓ ${o.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderAdmin() {
+      return `
+        <div class="p-6 max-w-2xl mx-auto">
+          <h2 class="text-2xl font-bold mb-6">⚙️ Panel de Administración</h2>
+          
+          <div class="bg-gray-800 rounded-2xl p-6 mb-6">
+            <h3 class="text-lg font-bold mb-4 text-yellow-400">⚠️ Zona de Pruebas</h3>
+            <p class="text-gray-400 mb-4">Estas opciones son para limpiar datos de prueba durante el desarrollo.</p>
+            
+            <div class="space-y-4">
+              <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                <h4 class="font-bold text-red-400 mb-2">🗑️ Eliminar Todas las Órdenes</h4>
+                <p class="text-sm text-gray-400 mb-3">Elimina TODAS las órdenes del sistema. Úsalo solo para limpiar datos de prueba.</p>
+                <button onclick="eliminarTodasBtn()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-medium">
+                  Eliminar Todas las Órdenes
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gray-800 rounded-2xl p-6">
+            <h3 class="text-lg font-bold mb-4">📊 Estadísticas</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Total Órdenes</p>
+                <p class="text-3xl font-bold">${ordenes.length}</p>
+              </div>
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Activas</p>
+                <p class="text-3xl font-bold text-yellow-400">${ordenes.filter(o => !['pagado', 'cancelado', 'entregado'].includes(o.estado)).length}</p>
+              </div>
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Completadas</p>
+                <p class="text-3xl font-bold text-green-400">${ordenes.filter(o => ['pagado', 'entregado'].includes(o.estado)).length}</p>
+              </div>
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Canceladas</p>
+                <p class="text-3xl font-bold text-red-400">${ordenes.filter(o => o.estado === 'cancelado').length}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lista de órdenes para eliminar individualmente -->
+          <div class="bg-gray-800 rounded-2xl p-6 mt-6">
+            <h3 class="text-lg font-bold mb-4">🗑️ Eliminar Órdenes Individuales</h3>
+            <div class="space-y-2 max-h-96 overflow-y-auto">
+              ${ordenes.map(o => `
+                <div class="flex items-center justify-between bg-gray-700 rounded-xl p-3">
+                  <div>
+                    <span class="font-bold">#${o.numero}</span>
+                    <span class="text-gray-400 ml-2">${o.mesa?.nombre}</span>
+                    <span class="text-xs ml-2 px-2 py-0.5 rounded ${
+                      o.estado === 'pendiente' ? 'bg-yellow-500/20 text-yellow-400' :
+                      o.estado === 'preparando' ? 'bg-blue-500/20 text-blue-400' :
+                      o.estado === 'listo' ? 'bg-green-500/20 text-green-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }">${o.estado}</span>
+                  </div>
+                  <button onclick="eliminarOrdenBtn('${o.id}')" class="p-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm">
+                    🗑️
+                  </button>
+                </div>
+              `).join('') || '<p class="text-gray-400 text-center">No hay órdenes</p>'}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderModalDetalle() {
+      const o = ordenSeleccionada;
+      if (!o) return '';
+
+      return `
+        <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="cerrarDetalle()">
+          <div class="bg-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
+            <div class="p-6 border-b border-gray-700 flex items-center justify-between">
+              <div>
+                <p class="text-4xl font-black">#${o.numero}</p>
+                <p class="text-xl text-amber-400">${o.mesa?.nombre}</p>
+              </div>
+              <button onclick="cerrarDetalle()" class="p-3 hover:bg-gray-700 rounded-xl text-2xl">✕</button>
+            </div>
+            
+            <div class="p-6">
+              <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="bg-gray-700 rounded-xl p-4">
+                  <p class="text-gray-400 text-sm">Mesero</p>
+                  <p class="font-semibold">${o.meseroNombre || '-'}</p>
+                </div>
+                <div class="bg-gray-700 rounded-xl p-4">
+                  <p class="text-gray-400 text-sm">Tiempo</p>
+                  <p class="font-semibold">${tiempoTranscurrido(o.fechaCreacion)}</p>
+                </div>
+                <div class="bg-gray-700 rounded-xl p-4">
+                  <p class="text-gray-400 text-sm">Tiempos</p>
+                  <p class="font-semibold">${o.tiempos?.length || 1}</p>
+                </div>
+              </div>
+
+              <h3 class="font-bold mb-3">Productos por Tiempo</h3>
+              <div class="space-y-4 mb-6">
+                ${(o.tiempos && o.tiempos.length > 0) ? o.tiempos.map((tiempo, idx) => `
+                  <div class="bg-gray-700 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="font-bold text-amber-400">⏱️ Tiempo ${tiempo.numero}</span>
+                      <span class="text-sm text-gray-400">${new Date(tiempo.hora).toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit'})}</span>
+                    </div>
+                    ${tiempo.items.map(i => `
+                      <div class="flex items-center gap-3 py-2">
+                        <span class="w-10 h-10 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-xl">${i.cantidad}</span>
+                        <span class="text-lg">${i.nombre}</span>
+                      </div>
+                    `).join('')}
+                    ${tiempo.notas ? `<p class="text-amber-400 text-sm mt-2 bg-amber-500/10 p-2 rounded">📝 ${tiempo.notas}</p>` : ''}
+                  </div>
+                `).join('') : `
+                  <div class="bg-gray-700 rounded-xl p-4">
+                    ${(o.items || []).map(i => `
+                      <div class="flex items-center gap-3 py-2">
+                        <span class="w-10 h-10 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-xl">${i.cantidad}</span>
+                        <span class="text-lg">${i.nombre}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                `}
+              </div>
+
+              <div class="flex items-center justify-between p-4 bg-gray-700 rounded-xl mb-6">
+                <span class="text-lg">Total:</span>
+                <span class="text-2xl font-bold text-amber-400">${fmt(o.total)}</span>
+              </div>
+
+              <div class="flex gap-3">
+                <button onclick="imprimirOrden('${o.id}')" class="flex-1 bg-gray-700 hover:bg-gray-600 py-4 rounded-xl font-bold">
+                  🖨️ Imprimir
+                </button>
+                ${o.estado === 'pendiente' ? `
+                  <button onclick="iniciarPreparacion('${o.id}'); cerrarDetalle();" class="flex-1 bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-bold">
+                    👨‍🍳 Iniciar
+                  </button>
+                ` : o.estado === 'preparando' ? `
+                  <button onclick="marcarListo('${o.id}'); cerrarDetalle();" class="flex-1 bg-green-600 hover:bg-green-700 py-4 rounded-xl font-bold">
+                    ✅ ¡Listo!
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ========== ACCIONES ==========
+    window.iniciarSesion = async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        if ('Notification' in window) {
+          Notification.requestPermission();
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    };
+
+    // ========== FUNCIONES DE CHECADA MULTI-EMPLEADO ==========
+    async function cargarEmpleadosCocina() {
+      try {
+        const snap = await getDocs(collection(db, 'empleados'));
+        empleadosCocina = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(e => PUESTOS_COCINA.includes(e.puesto) && e.activo !== false);
+        console.log('Empleados de cocina cargados:', empleadosCocina.length);
+      } catch (e) {
+        console.error('Error cargando empleados:', e);
+        empleadosCocina = [];
+      }
+    }
+
+    async function cargarChecadasHoy() {
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        const q = query(
+          collection(db, 'checadas'),
+          where('fecha', '==', hoy),
+          where('app', '==', 'cocina')
+        );
+        const snap = await getDocs(q);
+        checadasHoy = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+      } catch (e) {
+        console.error('Error cargando checadas:', e);
+        checadasHoy = [];
+      }
+    }
+
+    // Mantener compatibilidad con código anterior
+    async function cargarChecadaHoy() {
+      await cargarEmpleadosCocina();
+      await cargarChecadasHoy();
+    }
+
+    window.mostrarModalChecada = () => {
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      
+      const modal = document.createElement('div');
+      modal.id = 'modal-checada';
+      modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto';
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      
+      // Obtener checada de cada empleado
+      const empleadosConChecada = empleadosCocina.map(emp => {
+        const checada = checadasHoy.find(c => c.empleadoId === emp.id);
+        return { ...emp, checada };
+      });
+      
+      modal.innerHTML = `
+        <div class="bg-gray-800 rounded-3xl p-6 w-full max-w-md border border-gray-700 my-4">
+          <div class="text-center mb-6">
+            <div class="text-5xl mb-2">👨‍🍳</div>
+            <h2 class="text-xl font-bold text-white">Asistencia de Cocina</h2>
+            <p class="text-gray-400">${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <p class="text-amber-400 text-sm mt-1">🕐 ${horaActual}</p>
+          </div>
+          
+          ${empleadosCocina.length === 0 ? `
+            <div class="bg-yellow-500/20 rounded-xl p-4 mb-4 text-center">
+              <p class="text-yellow-400">No hay empleados de cocina registrados</p>
+              <p class="text-gray-400 text-sm mt-2">Agrega empleados con puesto de Chef, Cocinero o Ayudante de Cocina en el sistema principal.</p>
+            </div>
+          ` : `
+            <div class="space-y-3 max-h-[60vh] overflow-y-auto mb-4">
+              ${empleadosConChecada.map(emp => {
+                const checada = emp.checada;
+                const tieneEntrada = !!checada?.entrada;
+                const tieneSalida = !!checada?.salida;
+                
+                return `
+                  <div class="bg-gray-700 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold">
+                          ${emp.nombre?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div>
+                          <p class="font-semibold text-white">${emp.nombre || 'Sin nombre'}</p>
+                          <p class="text-xs text-gray-400">${emp.puesto === 'chef' ? '👨‍🍳 Chef' : emp.puesto === 'cocinero' ? '🍳 Cocinero' : '🥄 Ayudante'}</p>
+                        </div>
+                      </div>
+                      <div class="text-right">
+                        ${tieneEntrada ? `
+                          <span class="text-green-400 font-mono">${checada.entrada}</span>
+                          ${tieneSalida ? `<span class="text-blue-400 font-mono ml-2">→ ${checada.salida}</span>` : ''}
+                        ` : `
+                          <span class="text-gray-500 text-sm">Sin registro</span>
+                        `}
+                      </div>
+                    </div>
+                    <div class="flex gap-2">
+                      ${!tieneEntrada ? `
+                        <button onclick="registrarEntradaEmpleado('${emp.id}', '${emp.nombre}')" 
+                          class="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 rounded-lg text-sm">
+                          ✅ Entrada
+                        </button>
+                      ` : !tieneSalida ? `
+                        <button onclick="registrarSalidaEmpleado('${emp.id}', '${checada?.id}')" 
+                          class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-lg text-sm">
+                          🚪 Salida
+                        </button>
+                      ` : `
+                        <div class="flex-1 text-center text-green-400 text-sm py-2">
+                          ✅ Jornada completada
+                        </div>
+                      `}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+          
+          <div class="space-y-3">
+            <button onclick="agregarEmpleadoTemporal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium py-3 rounded-xl">
+              ➕ Agregar empleado temporal
+            </button>
+            <button onclick="document.getElementById('modal-checada').remove()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 rounded-xl">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    };
+
+    window.registrarEntradaEmpleado = async (empleadoId, empleadoNombre) => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        const docRef = await addDoc(collection(db, 'checadas'), {
+          empleadoId,
+          empleadoNombre,
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null,
+          app: 'cocina',
+          fechaCreacion: serverTimestamp()
+        });
+        
+        checadasHoy.push({
+          id: docRef.id,
+          empleadoId,
+          empleadoNombre,
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null
+        });
+        
+        document.getElementById('modal-checada')?.remove();
+        mostrarModalChecada(); // Reabrir para actualizar
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      } catch (e) {
+        alert('Error al registrar entrada: ' + e.message);
+      }
+    };
+
+    window.registrarSalidaEmpleado = async (empleadoId, checadaId) => {
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        await updateDoc(doc(db, 'checadas', checadaId), {
+          salida: horaActual,
+          fechaSalida: serverTimestamp()
+        });
+        
+        // Actualizar en memoria
+        const idx = checadasHoy.findIndex(c => c.id === checadaId);
+        if (idx >= 0) {
+          checadasHoy[idx].salida = horaActual;
+        }
+        
+        document.getElementById('modal-checada')?.remove();
+        mostrarModalChecada(); // Reabrir para actualizar
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
+      } catch (e) {
+        alert('Error al registrar salida: ' + e.message);
+      }
+    };
+
+    window.agregarEmpleadoTemporal = () => {
+      const nombre = prompt('Nombre del empleado temporal:');
+      if (!nombre || !nombre.trim()) return;
+      
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      // Generar ID temporal
+      const tempId = 'temp-' + Date.now();
+      
+      addDoc(collection(db, 'checadas'), {
+        empleadoId: tempId,
+        empleadoNombre: nombre.trim(),
+        fecha: hoy,
+        entrada: horaActual,
+        salida: null,
+        app: 'cocina',
+        temporal: true,
+        fechaCreacion: serverTimestamp()
+      }).then((docRef) => {
+        checadasHoy.push({
+          id: docRef.id,
+          empleadoId: tempId,
+          empleadoNombre: nombre.trim(),
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null,
+          temporal: true
+        });
+        
+        // Agregar a la lista temporal para mostrar en el modal
+        empleadosCocina.push({
+          id: tempId,
+          nombre: nombre.trim(),
+          puesto: 'ayudante-cocina',
+          temporal: true
+        });
+        
+        document.getElementById('modal-checada')?.remove();
+        mostrarModalChecada();
+        
+        alert('✅ ' + nombre.trim() + ' registrado: ' + horaActual);
+      }).catch(e => {
+        alert('Error: ' + e.message);
+      });
+    };
+
+    window.cerrarSesion = async () => {
+      if (confirm('¿Cerrar sesión?')) {
+        await signOut(auth);
+      }
+    };
+
+    window.setVista = (v) => { vista = v; render(); };
+    window.toggleSonido = () => { 
+      sonidoActivo = !sonidoActivo; 
+      if (sonidoActivo) reproducirSonido();
+      render(); 
+    };
+    window.probarSonido = () => {
+      reproducirSonido();
+    };
+
+    window.verDetalle = (id) => {
+      ordenSeleccionada = ordenes.find(o => o.id === id);
+      render();
+    };
+
+    window.cerrarDetalle = () => {
+      ordenSeleccionada = null;
+      render();
+    };
+
+    window.iniciarPreparacion = (id) => cambiarEstado(id, 'preparando');
+    window.marcarListo = (id) => cambiarEstado(id, 'listo');
+
+    window.imprimirOrden = (id) => {
+      const orden = ordenes.find(o => o.id === id);
+      if (orden) {
+        imprimirTicket(orden);
+      }
+    };
+
+    window.eliminarOrdenBtn = (id) => eliminarOrden(id);
+    window.eliminarTodasBtn = () => eliminarTodasLasOrdenes();
+
+    setInterval(() => render(), 60000);
+
+    // ========== AUTH ==========
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        usuario = { uid: user.uid, email: user.email };
+        
+        // Cargar datos del usuario desde Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+          if (userDoc.exists()) {
+            usuarioData = userDoc.data();
+          } else {
+            usuarioData = { rol: 'cocina' }; // Asumir cocina si no hay documento
+          }
+        } catch (e) {
+          console.error('Error cargando datos de usuario:', e);
+          usuarioData = { rol: 'cocina' };
+        }
+        
+        // Solo cargar datos si tiene permiso
+        if (ROLES_PERMITIDOS.includes(usuarioData?.rol)) {
+          escucharOrdenes();
+          await cargarChecadaHoy(); // Carga empleados de cocina y sus checadas
+        }
+      } else {
+        usuario = null;
+        usuarioData = null;
+        ordenes = [];
+        checadaHoy = null;
+        empleadosCocina = [];
+        checadasHoy = [];
+      }
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
