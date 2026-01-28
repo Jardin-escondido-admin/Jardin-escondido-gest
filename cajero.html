@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>💵 Caja - Jardín Escondido</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { overscroll-behavior: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .slide-up { animation: slideUp 0.3s ease-out; }
+    @media print {
+      body * { visibility: hidden; }
+      #ticket-print, #ticket-print * { visibility: visible; }
+      #ticket-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #000;
+        background: #fff;
+      }
+    }
+    .ticket-font { font-family: 'Courier New', monospace; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app">
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600">
+      <div class="text-center text-white">
+        <div class="text-6xl mb-4">💵</div>
+        <p class="text-lg">Cargando caja...</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="ticket-print" class="hidden"></div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { getFirestore, collection, doc, setDoc, addDoc, getDoc, getDocs, onSnapshot, query, orderBy, where, serverTimestamp, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    // ========== FIREBASE CONFIG ==========
+    const firebaseConfig = {
+      apiKey: "AIzaSyAVB0cuMbczpdp1EXWZZaXV2uEoW0LiYPo",
+      authDomain: "jardin-escondido.firebaseapp.com",
+      projectId: "jardin-escondido",
+      storageBucket: "jardin-escondido.firebasestorage.app",
+      messagingSenderId: "41075573711",
+      appId: "1:41075573711:web:1566bc05ec7048d4fa48ba"
+    };
+
+    const appFB = initializeApp(firebaseConfig);
+    const auth = getAuth(appFB);
+    const db = getFirestore(appFB, 'jardin-escondido-db');
+
+    // ========== ESTADO ==========
+    let usuario = null;
+    let usuarioData = null;
+    let ordenes = [];
+    let ordenSeleccionada = null;
+    let vista = 'ordenes'; // ordenes, corte, historial
+    let checadaHoy = null;
+    let corteCaja = {
+      fondoInicial: 0,
+      efectivo: 0,
+      tarjeta: 0,
+      transferencia: 0,
+      ventas: [],
+      gastos: []
+    };
+    let cajaAbierta = false;
+    let fondoInicial = 0;
+
+    // Roles permitidos
+    const ROLES_PERMITIDOS = ['admin', 'cajero', 'gerente'];
+    
+    // Logo para tickets (escala de grises)
+    const LOGO_TICKET = 'data:image/jpeg;base64,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';
+
+    // ========== UTILIDADES ==========
+    const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+    const fmtHora = (fecha) => {
+      if (!fecha) return '-';
+      const d = fecha.toDate ? fecha.toDate() : new Date(fecha);
+      return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    // ========== FIREBASE ==========
+    function escucharOrdenes() {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
+      const q = query(
+        collection(db, 'ordenesRestaurante'),
+        orderBy('fechaCreacion', 'desc')
+      );
+
+      onSnapshot(q, (snap) => {
+        ordenes = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(o => {
+            // Filtrar solo órdenes de hoy
+            const fecha = o.fechaCreacion?.toDate ? o.fechaCreacion.toDate() : new Date(o.fechaCreacion);
+            return fecha >= hoy;
+          });
+        render();
+      });
+    }
+
+    async function cargarCorteDia() {
+      const hoy = new Date().toISOString().slice(0, 10);
+      try {
+        const corteDoc = await getDoc(doc(db, 'cortesCaja', hoy));
+        if (corteDoc.exists()) {
+          const data = corteDoc.data();
+          corteCaja = data;
+          cajaAbierta = data.estado === 'abierta';
+          fondoInicial = data.fondoInicial || 0;
+        } else {
+          cajaAbierta = false;
+          fondoInicial = 0;
+        }
+      } catch (e) {
+        console.error('Error cargando corte:', e);
+      }
+    }
+
+    // ========== RENDER ==========
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (!usuario) {
+        app.innerHTML = renderLogin();
+        return;
+      }
+      
+      if (usuarioData && !ROLES_PERMITIDOS.includes(usuarioData.rol)) {
+        app.innerHTML = renderAccesoDenegado();
+        return;
+      }
+
+      // Si la caja no está abierta, mostrar pantalla de apertura
+      if (!cajaAbierta && vista !== 'historial') {
+        app.innerHTML = `
+          <div class="min-h-screen">
+            ${renderHeader()}
+            ${renderAperturaCaja()}
+          </div>
+        `;
+        return;
+      }
+
+      let contenido = '';
+      if (vista === 'ordenes') contenido = renderOrdenes();
+      else if (vista === 'corte') contenido = renderCorte();
+      else if (vista === 'historial') contenido = renderHistorial();
+
+      app.innerHTML = `
+        <div class="min-h-screen pb-4">
+          ${renderHeader()}
+          ${contenido}
+        </div>
+        ${ordenSeleccionada ? renderModalCobrar() : ''}
+      `;
+    }
+
+    function renderLogin() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center p-4">
+          <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl">
+            <div class="text-center mb-8">
+              <div class="text-5xl mb-3">💵</div>
+              <h1 class="text-2xl font-bold text-gray-800">Caja</h1>
+              <p class="text-gray-500">Jardín Escondido</p>
+            </div>
+            <div class="space-y-4">
+              <input id="email" type="email" placeholder="Correo electrónico" 
+                class="w-full p-4 bg-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+              <input id="password" type="password" placeholder="Contraseña" 
+                onkeypress="if(event.key==='Enter')iniciarSesion()"
+                class="w-full p-4 bg-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+              <button onclick="iniciarSesion()" 
+                class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-4 rounded-xl active:scale-95 transition-transform">
+                Entrar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAccesoDenegado() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center p-4">
+          <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center">
+            <div class="text-5xl mb-3">🚫</div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Acceso Denegado</h1>
+            <p class="text-gray-500 mb-4">Esta app es solo para cajeros y administradores.</p>
+            <div class="bg-gray-100 rounded-xl p-4 mb-6">
+              <p class="text-sm text-gray-600">Tu rol: <strong>${usuarioData?.rol || 'Sin rol'}</strong></p>
+            </div>
+            <button onclick="cerrarSesion()" class="text-gray-500 hover:text-gray-700">Cerrar sesión</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHeader() {
+      const horaEntrada = checadaHoy?.entrada || null;
+      const horaSalida = checadaHoy?.salida || null;
+      const ordenesListas = ordenes.filter(o => o.estado === 'listo').length;
+      const ordenesPorCobrar = ordenes.filter(o => !['pagado', 'cancelado'].includes(o.estado)).length;
+      
+      return `
+        <header class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 sticky top-0 z-40 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div>
+                <h1 class="font-bold text-xl">💵 Caja</h1>
+                <p class="text-emerald-200 text-sm">${usuarioData?.nombre || usuario?.email}</p>
+              </div>
+              ${cajaAbierta ? `
+                <div class="flex gap-2">
+                  <span class="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
+                    📋 ${ordenesPorCobrar} por cobrar
+                  </span>
+                  ${ordenesListas > 0 ? `
+                    <span class="px-3 py-1 bg-green-400 text-green-900 rounded-full text-sm font-medium pulse">
+                      ✅ ${ordenesListas} listas
+                    </span>
+                  ` : ''}
+                </div>
+              ` : ''}
+            </div>
+            <div class="flex items-center gap-2">
+              <!-- Checada -->
+              <button onclick="mostrarModalChecada()" 
+                class="px-3 py-2 rounded-xl flex items-center gap-1 text-sm font-medium ${horaEntrada ? (horaSalida ? 'bg-green-500' : 'bg-white/20') : 'bg-red-500 animate-pulse'}">
+                ${!horaEntrada ? '⏰ Entrada' : horaSalida ? '✅' : '🕐 ' + horaEntrada}
+              </button>
+              
+              <!-- Navegación -->
+              <div class="flex bg-white/10 rounded-xl p-1">
+                <button onclick="setVista('ordenes')" class="px-3 py-2 rounded-lg text-sm font-medium ${vista === 'ordenes' ? 'bg-white text-emerald-700' : 'hover:bg-white/10'}">
+                  🧾 Cobrar
+                </button>
+                <button onclick="setVista('corte')" class="px-3 py-2 rounded-lg text-sm font-medium ${vista === 'corte' ? 'bg-white text-emerald-700' : 'hover:bg-white/10'}">
+                  📊 Corte
+                </button>
+                <button onclick="setVista('historial')" class="px-3 py-2 rounded-lg text-sm font-medium ${vista === 'historial' ? 'bg-white text-emerald-700' : 'hover:bg-white/10'}">
+                  📜 Historial
+                </button>
+              </div>
+              
+              <button onclick="cerrarSesion()" class="p-2 hover:bg-white/20 rounded-xl">🚪</button>
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderAperturaCaja() {
+      return `
+        <div class="flex items-center justify-center min-h-[80vh] p-4">
+          <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-xl">
+            <div class="text-center mb-8">
+              <div class="text-6xl mb-4">🔐</div>
+              <h2 class="text-2xl font-bold text-gray-800">Apertura de Caja</h2>
+              <p class="text-gray-500">Ingresa el fondo inicial para comenzar</p>
+            </div>
+            
+            <div class="space-y-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Fondo Inicial</label>
+                <div class="relative">
+                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg">$</span>
+                  <input type="number" id="fondo-inicial" placeholder="0.00" step="0.01" min="0"
+                    class="w-full p-4 pl-10 text-2xl font-bold border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none" />
+                </div>
+              </div>
+              
+              <div class="bg-emerald-50 rounded-xl p-4">
+                <p class="text-sm text-emerald-800">
+                  <strong>📋 Recuerda:</strong> Cuenta el efectivo en caja antes de abrir. Este monto será tu referencia para el corte.
+                </p>
+              </div>
+              
+              <button onclick="abrirCaja()" 
+                class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-4 rounded-xl text-lg hover:from-emerald-600 hover:to-teal-600 transition-all">
+                🔓 Abrir Caja
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOrdenes() {
+      const porCobrar = ordenes.filter(o => !['pagado', 'cancelado'].includes(o.estado));
+      const listas = porCobrar.filter(o => o.estado === 'listo');
+      const enProceso = porCobrar.filter(o => o.estado !== 'listo');
+      
+      return `
+        <div class="p-4 space-y-6">
+          <!-- Órdenes Listas para Cobrar -->
+          ${listas.length > 0 ? `
+            <div>
+              <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                Listas para Cobrar (${listas.length})
+              </h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${listas.map(o => renderOrdenCard(o, true)).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          <!-- Órdenes en Proceso -->
+          ${enProceso.length > 0 ? `
+            <div>
+              <h2 class="text-lg font-bold text-gray-800 mb-3">En Proceso (${enProceso.length})</h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${enProceso.map(o => renderOrdenCard(o, false)).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          ${porCobrar.length === 0 ? `
+            <div class="bg-white rounded-2xl p-12 text-center">
+              <div class="text-6xl mb-4">✨</div>
+              <p class="text-xl text-gray-500">No hay órdenes pendientes</p>
+              <p class="text-gray-400 mt-2">Las nuevas órdenes aparecerán aquí</p>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderOrdenCard(orden, lista) {
+      const total = calcularTotalOrden(orden);
+      const items = obtenerItemsOrden(orden);
+      
+      return `
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden ${lista ? 'ring-2 ring-green-400' : ''}" onclick="seleccionarOrden('${orden.id}')">
+          <div class="p-4 ${lista ? 'bg-green-500 text-white' : 'bg-gray-100'}">
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="font-bold text-lg">${orden.mesa?.nombre || 'Sin mesa'}</p>
+                <p class="text-sm opacity-80">#${orden.numero || '---'}</p>
+              </div>
+              <div class="text-right">
+                <p class="font-bold text-xl">${fmt(total)}</p>
+                <p class="text-sm opacity-80">${fmtHora(orden.fechaCreacion)}</p>
+              </div>
+            </div>
+          </div>
+          <div class="p-4">
+            <div class="space-y-1 text-sm text-gray-600 max-h-24 overflow-y-auto">
+              ${items.slice(0, 4).map(i => `
+                <div class="flex justify-between">
+                  <span>${i.cantidad}x ${i.nombre}</span>
+                  <span>${fmt(i.precio * i.cantidad)}</span>
+                </div>
+              `).join('')}
+              ${items.length > 4 ? `<p class="text-gray-400">+ ${items.length - 4} más...</p>` : ''}
+            </div>
+            <div class="mt-4 flex justify-between items-center">
+              <span class="text-sm text-gray-500">Mesero: ${orden.meseroNombre || '-'}</span>
+              <span class="px-3 py-1 rounded-full text-xs font-medium ${
+                orden.estado === 'listo' ? 'bg-green-100 text-green-800' :
+                orden.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :
+                'bg-yellow-100 text-yellow-800'
+              }">${orden.estado}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderModalCobrar() {
+      const orden = ordenSeleccionada;
+      if (!orden) return '';
+      
+      const total = calcularTotalOrden(orden);
+      const items = obtenerItemsOrden(orden);
+      const metodoPago = window.metodoPago || 'efectivo';
+      const propina = window.propinaActual || 0;
+      const efectivoRecibido = window.efectivoRecibido || 0;
+      const totalConPropina = total + propina;
+      const cambio = efectivoRecibido - totalConPropina;
+      
+      return `
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="cerrarModalCobro()">
+          <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[95vh] overflow-auto" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-t-3xl sticky top-0">
+              <div class="flex justify-between items-center">
+                <div>
+                  <h2 class="text-xl font-bold">${orden.mesa?.nombre || 'Orden'} - #${orden.numero}</h2>
+                  <p class="text-emerald-200">${orden.meseroNombre || 'Sin mesero'}</p>
+                </div>
+                <button onclick="cerrarModalCobro()" class="p-2 hover:bg-white/20 rounded-xl text-2xl">✕</button>
+              </div>
+            </div>
+            
+            <div class="p-5 space-y-6">
+              <!-- Detalle de la orden -->
+              <div class="bg-gray-50 rounded-xl p-4">
+                <h3 class="font-semibold mb-3">Detalle de consumo</h3>
+                <div class="space-y-2 max-h-40 overflow-y-auto">
+                  ${items.map(i => `
+                    <div class="flex justify-between text-sm">
+                      <span>${i.cantidad}x ${i.nombre}</span>
+                      <span class="font-medium">${fmt(i.precio * i.cantidad)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="border-t mt-3 pt-3 flex justify-between font-bold text-lg">
+                  <span>Subtotal</span>
+                  <span>${fmt(total)}</span>
+                </div>
+              </div>
+              
+              <!-- Propina -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Propina (opcional)</label>
+                <div class="flex gap-2">
+                  <button onclick="setPropina(0)" class="flex-1 py-3 rounded-xl font-medium ${propina === 0 ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'}">Sin propina</button>
+                  <button onclick="setPropina(${Math.round(total * 0.10)})" class="flex-1 py-3 rounded-xl font-medium ${propina === Math.round(total * 0.10) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'}">10% (${fmt(total * 0.10)})</button>
+                  <button onclick="setPropina(${Math.round(total * 0.15)})" class="flex-1 py-3 rounded-xl font-medium ${propina === Math.round(total * 0.15) ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'}">15% (${fmt(total * 0.15)})</button>
+                  <input type="number" placeholder="Otro" class="w-24 p-3 border rounded-xl text-center" 
+                    onchange="setPropina(parseFloat(this.value) || 0)" />
+                </div>
+              </div>
+              
+              <!-- Total -->
+              <div class="bg-emerald-50 rounded-xl p-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-lg">Total a Cobrar</span>
+                  <span class="text-3xl font-bold text-emerald-700">${fmt(totalConPropina)}</span>
+                </div>
+              </div>
+              
+              <!-- Método de pago -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
+                <div class="grid grid-cols-3 gap-2">
+                  <button onclick="setMetodoPago('efectivo')" class="py-4 rounded-xl font-medium flex flex-col items-center gap-1 ${metodoPago === 'efectivo' ? 'bg-emerald-600 text-white ring-2 ring-emerald-300' : 'bg-gray-100 text-gray-700'}">
+                    <span class="text-2xl">💵</span>
+                    <span>Efectivo</span>
+                  </button>
+                  <button onclick="setMetodoPago('tarjeta')" class="py-4 rounded-xl font-medium flex flex-col items-center gap-1 ${metodoPago === 'tarjeta' ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-gray-100 text-gray-700'}">
+                    <span class="text-2xl">💳</span>
+                    <span>Tarjeta</span>
+                  </button>
+                  <button onclick="setMetodoPago('transferencia')" class="py-4 rounded-xl font-medium flex flex-col items-center gap-1 ${metodoPago === 'transferencia' ? 'bg-purple-600 text-white ring-2 ring-purple-300' : 'bg-gray-100 text-gray-700'}">
+                    <span class="text-2xl">📱</span>
+                    <span>Transferencia</span>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Efectivo recibido (solo si es efectivo) -->
+              ${metodoPago === 'efectivo' ? `
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Efectivo Recibido</label>
+                  <div class="flex gap-2 mb-3">
+                    ${[50, 100, 200, 500, 1000].map(monto => `
+                      <button onclick="setEfectivoRecibido(${monto})" class="flex-1 py-2 rounded-lg text-sm font-medium ${efectivoRecibido === monto ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-400' : 'bg-gray-100'}">${fmt(monto)}</button>
+                    `).join('')}
+                  </div>
+                  <input type="number" id="efectivo-input" placeholder="Cantidad recibida" value="${efectivoRecibido || ''}"
+                    onchange="setEfectivoRecibido(parseFloat(this.value) || 0)"
+                    class="w-full p-4 text-xl font-bold border-2 rounded-xl focus:border-emerald-500 outline-none" />
+                  ${efectivoRecibido >= totalConPropina ? `
+                    <div class="mt-3 p-4 bg-amber-50 rounded-xl flex justify-between items-center">
+                      <span class="text-amber-800 font-medium">Cambio:</span>
+                      <span class="text-2xl font-bold text-amber-600">${fmt(cambio)}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+              
+              <!-- Botones de acción -->
+              <div class="flex gap-3">
+                <button onclick="cerrarModalCobro()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-4 rounded-xl font-medium">
+                  Cancelar
+                </button>
+                <button onclick="procesarPago()" 
+                  class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-4 rounded-xl font-bold text-lg"
+                  ${metodoPago === 'efectivo' && efectivoRecibido < totalConPropina ? 'disabled style="opacity:0.5"' : ''}>
+                  ✅ Cobrar ${fmt(totalConPropina)}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCorte() {
+      const pagadas = ordenes.filter(o => o.estado === 'pagado');
+      const efectivo = pagadas.filter(o => o.metodoPago === 'efectivo').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const tarjeta = pagadas.filter(o => o.metodoPago === 'tarjeta').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const transferencia = pagadas.filter(o => o.metodoPago === 'transferencia').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const propinas = pagadas.reduce((s, o) => s + (o.propina || 0), 0);
+      const totalVentas = efectivo + tarjeta + transferencia;
+      const efectivoEnCaja = fondoInicial + efectivo;
+      
+      return `
+        <div class="p-4 space-y-6">
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+              📊 Corte de Caja
+              <span class="text-sm font-normal text-gray-500">${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            </h2>
+            
+            <!-- Resumen -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div class="bg-emerald-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Fondo Inicial</p>
+                <p class="text-2xl font-bold text-emerald-700">${fmt(fondoInicial)}</p>
+              </div>
+              <div class="bg-blue-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Total Ventas</p>
+                <p class="text-2xl font-bold text-blue-700">${fmt(totalVentas)}</p>
+              </div>
+              <div class="bg-amber-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Propinas</p>
+                <p class="text-2xl font-bold text-amber-700">${fmt(propinas)}</p>
+              </div>
+              <div class="bg-purple-50 rounded-xl p-4">
+                <p class="text-sm text-gray-500">Ventas del Día</p>
+                <p class="text-2xl font-bold text-purple-700">${pagadas.length}</p>
+              </div>
+            </div>
+            
+            <!-- Desglose por método de pago -->
+            <div class="bg-gray-50 rounded-xl p-4 mb-6">
+              <h3 class="font-semibold mb-4">Desglose por Método de Pago</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="flex items-center gap-2"><span class="text-xl">💵</span> Efectivo</span>
+                  <span class="font-bold text-lg">${fmt(efectivo)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="flex items-center gap-2"><span class="text-xl">💳</span> Tarjeta</span>
+                  <span class="font-bold text-lg">${fmt(tarjeta)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="flex items-center gap-2"><span class="text-xl">📱</span> Transferencia</span>
+                  <span class="font-bold text-lg">${fmt(transferencia)}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Efectivo en caja -->
+            <div class="bg-emerald-100 rounded-xl p-6 mb-6">
+              <div class="flex justify-between items-center">
+                <div>
+                  <p class="text-emerald-800 font-medium">Efectivo que debe haber en caja:</p>
+                  <p class="text-sm text-emerald-600">Fondo inicial + ventas en efectivo</p>
+                </div>
+                <p class="text-4xl font-bold text-emerald-700">${fmt(efectivoEnCaja)}</p>
+              </div>
+            </div>
+            
+            <!-- Cierre de caja -->
+            <div class="border-t pt-6">
+              <h3 class="font-semibold mb-4">Cierre de Caja</h3>
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Efectivo contado</label>
+                  <input type="number" id="efectivo-contado" placeholder="0.00" step="0.01"
+                    class="w-full p-4 text-xl font-bold border-2 rounded-xl focus:border-emerald-500 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Diferencia</label>
+                  <div id="diferencia-corte" class="w-full p-4 text-xl font-bold bg-gray-100 rounded-xl">
+                    -
+                  </div>
+                </div>
+              </div>
+              <button onclick="cerrarCaja()" class="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold text-lg">
+                🔒 Cerrar Caja y Generar Corte
+              </button>
+            </div>
+          </div>
+          
+          <!-- Ventas del día -->
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h3 class="font-semibold mb-4">Ventas del Día (${pagadas.length})</h3>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+              ${pagadas.length === 0 ? `
+                <p class="text-gray-400 text-center py-4">No hay ventas registradas</p>
+              ` : pagadas.map(o => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p class="font-medium">${o.mesa?.nombre || 'Orden'} #${o.numero}</p>
+                    <p class="text-sm text-gray-500">${fmtHora(o.fechaPago || o.fechaCreacion)} - ${o.metodoPago || 'efectivo'}</p>
+                  </div>
+                  <p class="font-bold">${fmt(o.totalPagado || o.total)}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHistorial() {
+      return `
+        <div class="p-4">
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-6">📜 Historial de Cortes</h2>
+            <p class="text-gray-500 text-center py-8">Próximamente: Historial de cortes anteriores</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // ========== FUNCIONES DE UTILIDAD ==========
+    function calcularTotalOrden(orden) {
+      if (orden.tiempos && orden.tiempos.length > 0) {
+        return orden.tiempos.reduce((total, tiempo) => {
+          return total + tiempo.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+        }, 0);
+      }
+      return orden.items?.reduce((sum, item) => sum + (item.precio * item.cantidad), 0) || orden.total || 0;
+    }
+
+    function obtenerItemsOrden(orden) {
+      if (orden.tiempos && orden.tiempos.length > 0) {
+        const itemsMap = new Map();
+        orden.tiempos.forEach(tiempo => {
+          tiempo.items.forEach(item => {
+            const key = item.id || item.nombre;
+            if (itemsMap.has(key)) {
+              itemsMap.get(key).cantidad += item.cantidad;
+            } else {
+              itemsMap.set(key, { ...item });
+            }
+          });
+        });
+        return Array.from(itemsMap.values());
+      }
+      return orden.items || [];
+    }
+
+    // ========== FUNCIONES DE CAJA ==========
+    window.abrirCaja = async () => {
+      const fondo = parseFloat(document.getElementById('fondo-inicial').value) || 0;
+      
+      if (fondo < 0) {
+        alert('El fondo inicial no puede ser negativo');
+        return;
+      }
+      
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        await setDoc(doc(db, 'cortesCaja', hoy), {
+          fecha: hoy,
+          fondoInicial: fondo,
+          estado: 'abierta',
+          cajero: usuarioData?.nombre || usuario?.email,
+          cajeroId: usuario.uid,
+          horaApertura: new Date().toLocaleTimeString('es-MX'),
+          fechaApertura: serverTimestamp()
+        });
+        
+        fondoInicial = fondo;
+        cajaAbierta = true;
+        render();
+        
+        alert('✅ Caja abierta correctamente');
+      } catch (e) {
+        alert('Error al abrir caja: ' + e.message);
+      }
+    };
+
+    window.cerrarCaja = async () => {
+      const efectivoContado = parseFloat(document.getElementById('efectivo-contado').value) || 0;
+      const pagadas = ordenes.filter(o => o.estado === 'pagado');
+      const efectivo = pagadas.filter(o => o.metodoPago === 'efectivo').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const tarjeta = pagadas.filter(o => o.metodoPago === 'tarjeta').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const transferencia = pagadas.filter(o => o.metodoPago === 'transferencia').reduce((s, o) => s + (o.totalPagado || 0), 0);
+      const propinas = pagadas.reduce((s, o) => s + (o.propina || 0), 0);
+      const efectivoEsperado = fondoInicial + efectivo;
+      const diferencia = efectivoContado - efectivoEsperado;
+      
+      if (!confirm(`¿Cerrar caja?\n\nEfectivo esperado: ${fmt(efectivoEsperado)}\nEfectivo contado: ${fmt(efectivoContado)}\nDiferencia: ${fmt(diferencia)}`)) {
+        return;
+      }
+      
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        await updateDoc(doc(db, 'cortesCaja', hoy), {
+          estado: 'cerrada',
+          horaCierre: new Date().toLocaleTimeString('es-MX'),
+          fechaCierre: serverTimestamp(),
+          efectivoContado,
+          efectivoEsperado,
+          diferencia,
+          totalEfectivo: efectivo,
+          totalTarjeta: tarjeta,
+          totalTransferencia: transferencia,
+          totalPropinas: propinas,
+          totalVentas: efectivo + tarjeta + transferencia,
+          numeroVentas: pagadas.length
+        });
+        
+        cajaAbierta = false;
+        alert('✅ Caja cerrada correctamente\n\n' + 
+          `Total ventas: ${fmt(efectivo + tarjeta + transferencia)}\n` +
+          `Diferencia: ${fmt(diferencia)}`);
+        render();
+      } catch (e) {
+        alert('Error al cerrar caja: ' + e.message);
+      }
+    };
+
+    // ========== FUNCIONES DE COBRO ==========
+    window.seleccionarOrden = (id) => {
+      ordenSeleccionada = ordenes.find(o => o.id === id);
+      window.metodoPago = 'efectivo';
+      window.propinaActual = 0;
+      window.efectivoRecibido = 0;
+      render();
+    };
+
+    window.cerrarModalCobro = () => {
+      ordenSeleccionada = null;
+      render();
+    };
+
+    window.setMetodoPago = (metodo) => {
+      window.metodoPago = metodo;
+      render();
+    };
+
+    window.setPropina = (monto) => {
+      window.propinaActual = monto;
+      render();
+    };
+
+    window.setEfectivoRecibido = (monto) => {
+      window.efectivoRecibido = monto;
+      render();
+    };
+
+    window.procesarPago = async () => {
+      if (!ordenSeleccionada) return;
+      
+      const total = calcularTotalOrden(ordenSeleccionada);
+      const propina = window.propinaActual || 0;
+      const totalConPropina = total + propina;
+      const metodoPago = window.metodoPago || 'efectivo';
+      
+      try {
+        await updateDoc(doc(db, 'ordenesRestaurante', ordenSeleccionada.id), {
+          estado: 'pagado',
+          metodoPago,
+          propina,
+          totalPagado: totalConPropina,
+          fechaPago: serverTimestamp(),
+          cajero: usuarioData?.nombre || usuario?.email
+        });
+        
+        // Generar ticket
+        generarTicket(ordenSeleccionada, totalConPropina, propina, metodoPago);
+        
+        ordenSeleccionada = null;
+        render();
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      } catch (e) {
+        alert('Error al procesar pago: ' + e.message);
+      }
+    };
+
+    function generarTicket(orden, total, propina, metodoPago) {
+      const items = obtenerItemsOrden(orden);
+      const subtotal = total - propina;
+      const fecha = new Date();
+      
+      const ticketHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            @page { size: 80mm auto; margin: 0; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              width: 80mm;
+              padding: 4mm;
+              background: white;
+              color: black;
+            }
+            .header {
+              text-align: center;
+              padding-bottom: 8px;
+              border-bottom: 2px dashed #000;
+              margin-bottom: 8px;
+            }
+            .header .logo-img { width: 50mm; height: auto; margin-bottom: 8px; }
+            .subtitle { font-size: 10px; color: #333; }
+            .datetime { font-size: 10px; margin-top: 5px; }
+            
+            .order-info {
+              padding: 8px 0;
+              border-bottom: 1px dashed #000;
+            }
+            .order-info div {
+              display: flex;
+              justify-content: space-between;
+              padding: 2px 0;
+            }
+            
+            .items { padding: 8px 0; }
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 4px 0;
+              border-bottom: 1px dotted #ccc;
+            }
+            .item-name { flex: 1; }
+            .item-price { text-align: right; min-width: 70px; }
+            
+            .totals {
+              padding-top: 8px;
+              border-top: 2px dashed #000;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 4px 0;
+            }
+            .total-row.grand {
+              font-size: 16px;
+              font-weight: bold;
+              border-top: 1px solid #000;
+              margin-top: 5px;
+              padding-top: 8px;
+            }
+            
+            .payment-method {
+              text-align: center;
+              padding: 8px;
+              margin: 8px 0;
+              background: #f0f0f0;
+              font-weight: bold;
+            }
+            
+            .footer {
+              text-align: center;
+              padding-top: 10px;
+              border-top: 2px dashed #000;
+              margin-top: 10px;
+            }
+            .footer-msg { font-size: 11px; margin-bottom: 5px; }
+            .footer-small { font-size: 9px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <img src="${LOGO_TICKET}" alt="Jardín Escondido" class="logo-img">
+            <div class="datetime">
+              ${fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}<br>
+              ${fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+          
+          <div class="order-info">
+            <div>
+              <span>Mesa:</span>
+              <strong>${orden.mesa?.nombre || 'N/A'}</strong>
+            </div>
+            <div>
+              <span>Orden:</span>
+              <strong>#${orden.numero || '---'}</strong>
+            </div>
+            <div>
+              <span>Mesero:</span>
+              <span>${orden.meseroNombre || '-'}</span>
+            </div>
+            <div>
+              <span>Cajero:</span>
+              <span>${usuarioData?.nombre || usuario?.email?.split('@')[0] || '-'}</span>
+            </div>
+          </div>
+          
+          <div class="items">
+            ${items.map(i => `
+              <div class="item-row">
+                <span class="item-name">${i.cantidad}x ${i.nombre}</span>
+                <span class="item-price">$${(i.precio * i.cantidad).toFixed(2)}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="totals">
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <span>$${subtotal.toFixed(2)}</span>
+            </div>
+            ${propina > 0 ? `
+              <div class="total-row">
+                <span>Propina:</span>
+                <span>$${propina.toFixed(2)}</span>
+              </div>
+            ` : ''}
+            <div class="total-row grand">
+              <span>TOTAL:</span>
+              <span>$${total.toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div class="payment-method">
+            ${metodoPago === 'efectivo' ? '💵' : metodoPago === 'tarjeta' ? '💳' : '📱'} 
+            PAGADO CON ${metodoPago.toUpperCase()}
+          </div>
+          
+          <div class="footer">
+            <div class="footer-msg">¡Gracias por su visita!</div>
+            <div class="footer-msg">Vuelva pronto 🌿</div>
+            <div class="footer-small">
+              <br>Jardín Escondido<br>
+              Tel: 55 1234 5678
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Preguntar si desea imprimir
+      if (confirm('¿Imprimir ticket de venta?')) {
+        // Usar iframe oculto para imprimir
+        let iframe = document.getElementById('print-iframe');
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.id = 'print-iframe';
+          iframe.style.cssText = 'position: fixed; right: 0; bottom: 0; width: 0; height: 0; border: 0;';
+          document.body.appendChild(iframe);
+        }
+        
+        const iframeDoc = iframe.contentWindow || iframe.contentDocument;
+        const doc = iframeDoc.document || iframeDoc;
+        
+        doc.open();
+        doc.write(ticketHTML);
+        doc.close();
+        
+        iframe.onload = () => {
+          setTimeout(() => {
+            try {
+              iframe.contentWindow.focus();
+              iframe.contentWindow.print();
+            } catch (e) {
+              const ventana = window.open('', '_blank', 'width=350,height=600');
+              if (ventana) {
+                ventana.document.write(ticketHTML);
+                ventana.document.close();
+                ventana.onload = () => ventana.print();
+              }
+            }
+          }, 300);
+        };
+      }
+    }
+
+    // ========== CHECADA ==========
+    async function cargarChecadaHoy() {
+      if (!usuario?.uid) return;
+      
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        const q = query(
+          collection(db, 'checadas'),
+          where('empleadoId', '==', usuario.uid),
+          where('fecha', '==', hoy)
+        );
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          checadaHoy = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        } else {
+          checadaHoy = null;
+        }
+      } catch (e) {
+        console.error('Error cargando checada:', e);
+      }
+    }
+
+    window.mostrarModalChecada = () => {
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      
+      const modal = document.createElement('div');
+      modal.id = 'modal-checada';
+      modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      
+      modal.innerHTML = `
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm">
+          <div class="text-center mb-6">
+            <div class="text-5xl mb-2">⏰</div>
+            <h2 class="text-xl font-bold">Control de Asistencia</h2>
+            <p class="text-gray-500">${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          </div>
+          
+          ${checadaHoy ? `
+            <div class="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Entrada:</span>
+                <span class="font-bold text-green-600">${checadaHoy.entrada || '-'}</span>
+              </div>
+              ${checadaHoy.salida ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Salida:</span>
+                  <span class="font-bold text-blue-600">${checadaHoy.salida}</span>
+                </div>
+              ` : ''}
+            </div>
+          ` : `
+            <div class="bg-yellow-50 rounded-xl p-4 mb-4 text-center">
+              <p class="text-yellow-800">No has registrado tu entrada hoy</p>
+            </div>
+          `}
+          
+          <div class="space-y-3">
+            ${!checadaHoy ? `
+              <button onclick="registrarEntrada()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl">
+                ✅ Registrar Entrada (${horaActual})
+              </button>
+            ` : !checadaHoy.salida ? `
+              <button onclick="registrarSalida()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-xl">
+                🚪 Registrar Salida (${horaActual})
+              </button>
+            ` : `
+              <div class="text-center text-green-600 font-semibold py-4">
+                ✅ Jornada completada
+              </div>
+            `}
+            <button onclick="document.getElementById('modal-checada').remove()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 rounded-xl">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    };
+
+    window.registrarEntrada = async () => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        const docRef = await addDoc(collection(db, 'checadas'), {
+          empleadoId: usuario.uid,
+          empleadoNombre: usuarioData?.nombre || usuario?.email?.split('@')[0] || 'Cajero',
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null,
+          app: 'cajero',
+          fechaCreacion: serverTimestamp()
+        });
+        
+        checadaHoy = {
+          id: docRef.id,
+          empleadoId: usuario.uid,
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null
+        };
+        
+        document.getElementById('modal-checada')?.remove();
+        render();
+        alert('✅ Entrada registrada: ' + horaActual);
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    };
+
+    window.registrarSalida = async () => {
+      if (!checadaHoy?.id) return;
+      
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        await updateDoc(doc(db, 'checadas', checadaHoy.id), {
+          salida: horaActual,
+          fechaSalida: serverTimestamp()
+        });
+        
+        checadaHoy.salida = horaActual;
+        
+        document.getElementById('modal-checada')?.remove();
+        render();
+        alert('✅ Salida registrada: ' + horaActual);
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    };
+
+    // ========== AUTH ==========
+    window.iniciarSesion = async () => {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      
+      if (!email || !password) {
+        alert('Ingresa correo y contraseña');
+        return;
+      }
+      
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        const errores = {
+          'auth/invalid-email': 'Correo no válido',
+          'auth/wrong-password': 'Contraseña incorrecta',
+          'auth/user-not-found': 'Usuario no encontrado'
+        };
+        alert(errores[e.code] || 'Error: ' + e.message);
+      }
+    };
+
+    window.cerrarSesion = async () => {
+      if (confirm('¿Cerrar sesión?')) {
+        await signOut(auth);
+      }
+    };
+
+    window.setVista = (v) => { vista = v; render(); };
+
+    // ========== INIT ==========
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        usuario = { uid: user.uid, email: user.email };
+        
+        try {
+          const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+          if (userDoc.exists()) {
+            usuarioData = userDoc.data();
+          } else {
+            usuarioData = { rol: 'cajero' };
+          }
+        } catch (e) {
+          usuarioData = { rol: 'cajero' };
+        }
+        
+        if (ROLES_PERMITIDOS.includes(usuarioData?.rol)) {
+          escucharOrdenes();
+          await cargarCorteDia();
+          await cargarChecadaHoy();
+        }
+      } else {
+        usuario = null;
+        usuarioData = null;
+        ordenes = [];
+        checadaHoy = null;
+        cajaAbierta = false;
+      }
+      render();
+    });
+
+    // Actualizar diferencia en tiempo real
+    document.addEventListener('input', (e) => {
+      if (e.target.id === 'efectivo-contado') {
+        const contado = parseFloat(e.target.value) || 0;
+        const pagadas = ordenes.filter(o => o.estado === 'pagado');
+        const efectivo = pagadas.filter(o => o.metodoPago === 'efectivo').reduce((s, o) => s + (o.totalPagado || 0), 0);
+        const esperado = fondoInicial + efectivo;
+        const diferencia = contado - esperado;
+        
+        const divDif = document.getElementById('diferencia-corte');
+        if (divDif) {
+          divDif.textContent = fmt(diferencia);
+          divDif.className = `w-full p-4 text-xl font-bold rounded-xl ${
+            diferencia === 0 ? 'bg-green-100 text-green-700' :
+            diferencia > 0 ? 'bg-blue-100 text-blue-700' :
+            'bg-red-100 text-red-700'
+          }`;
+        }
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

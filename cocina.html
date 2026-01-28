@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>👨‍🍳 Cocina - Jardín Escondido</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    .slide-in { animation: slideIn 0.3s ease-out; }
+    .pulse { animation: pulse 2s infinite; }
+    .shake { animation: shake 0.5s ease-in-out infinite; }
+    @keyframes ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(15deg); } 75% { transform: rotate(-15deg); } }
+    .ring { animation: ring 0.5s ease-in-out infinite; }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 5px #22c55e, 0 0 10px #22c55e; } 50% { box-shadow: 0 0 20px #22c55e, 0 0 30px #22c55e; } }
+    .glow-green { animation: glow 1s ease-in-out infinite; }
+    
+    @media print {
+      body * { visibility: hidden; }
+      #ticket-print, #ticket-print * { visibility: visible; }
+      #ticket-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm;
+        padding: 5mm;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #000;
+        background: #fff;
+      }
+      @page {
+        size: 80mm auto;
+        margin: 0;
+      }
+    }
+    
+    .ticket-preview {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-white">
+  <div id="app">
+    <div class="min-h-screen flex items-center justify-center">
+      <div class="text-center">
+        <div class="text-6xl mb-4">👨‍🍳</div>
+        <p class="text-lg">Conectando con cocina...</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="ticket-print" class="hidden"></div>
+
+  <audio id="notifSound" preload="auto">
+    <!-- Sonido de campana/alerta más fuerte -->
+    <source src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAEAAABVgANTU1NTU1NTU1NVVVVVVVVVVVVXBwcHBwcHBwcHCLi4uLi4uLi4uLpaWlpaWlpaWlwMDAwMDAwMDAwNra2tra2tra2tr09PT09PT09PT0//////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAVhEuEAhAAAAAAD/4xjEABcAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4xjEDx4Aa8YBQBAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxAUQ6DrUAUAQAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/jGMQPEAADSAAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=" type="audio/mp3">
+  </audio>
+  
+  <!-- Sonido alternativo con Web Audio API -->
+  <script>
+    // Crear sonido de alerta con Web Audio API (más confiable)
+    let audioContext = null;
+    
+    function crearSonidoAlerta() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 880; // Nota A5
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+      
+      // Segundo tono
+      setTimeout(() => {
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioContext.destination);
+        osc2.frequency.value = 1100; // Nota más alta
+        osc2.type = 'sine';
+        gain2.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        osc2.start(audioContext.currentTime);
+        osc2.stop(audioContext.currentTime + 0.5);
+      }, 200);
+      
+      // Tercer tono
+      setTimeout(() => {
+        const osc3 = audioContext.createOscillator();
+        const gain3 = audioContext.createGain();
+        osc3.connect(gain3);
+        gain3.connect(audioContext.destination);
+        osc3.frequency.value = 1320; // Nota aún más alta
+        osc3.type = 'sine';
+        gain3.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.7);
+        osc3.start(audioContext.currentTime);
+        osc3.stop(audioContext.currentTime + 0.7);
+      }, 400);
+    }
+    
+    window.reproducirAlerta = crearSonidoAlerta;
+  </script>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { getFirestore, collection, doc, getDoc, addDoc, onSnapshot, query, orderBy, where, updateDoc, deleteDoc, getDocs, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAVB0cuMbczpdp1EXWZZaXV2uEoW0LiYPo",
+      authDomain: "jardin-escondido.firebaseapp.com",
+      projectId: "jardin-escondido",
+      storageBucket: "jardin-escondido.firebasestorage.app",
+      messagingSenderId: "41075573711",
+      appId: "1:41075573711:web:1566bc05ec7048d4fa48ba"
+    };
+
+    const appFB = initializeApp(firebaseConfig);
+    const auth = getAuth(appFB);
+    const db = getFirestore(appFB, 'jardin-escondido-db');
+
+    // ========== ESTADO ==========
+    let usuario = null;
+    let usuarioData = null;
+    let ordenes = [];
+    let ordenSeleccionada = null;
+    let vista = 'cocina'; // cocina, historial, admin
+    let sonidoActivo = true;
+    let ordenesAnteriores = new Set();
+    let checadaHoy = null; // Checada del día actual
+    let empleadosCocina = []; // Empleados del área de cocina
+    let checadasHoy = []; // Checadas de todos los empleados de cocina
+
+    // Roles permitidos para esta app
+    const ROLES_PERMITIDOS = ['admin', 'cocina'];
+    
+    // Logo para tickets (escala de grises)
+    const LOGO_TICKET = 'data:image/jpeg;base64,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';
+    
+    // Puestos de cocina
+    const PUESTOS_COCINA = ['chef', 'cocinero', 'ayudante-cocina'];
+
+    // ========== UTILIDADES ==========
+    const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+    const tiempoTranscurrido = (fecha) => {
+      if (!fecha) return '-';
+      const ahora = new Date();
+      const creacion = fecha.toDate ? fecha.toDate() : new Date(fecha);
+      const mins = Math.floor((ahora - creacion) / 60000);
+      if (mins < 1) return 'Ahora';
+      if (mins < 60) return `${mins} min`;
+      return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    };
+
+    // ========== FIREBASE ==========
+    function escucharOrdenes() {
+      // Query simple sin filtros complejos para evitar problemas de índice
+      const q = query(
+        collection(db, 'ordenesRestaurante'),
+        orderBy('fechaCreacion', 'desc')
+      );
+
+      onSnapshot(q, (snap) => {
+        const nuevasOrdenes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Detectar órdenes nuevas o nuevos tiempos para notificar
+        nuevasOrdenes.forEach(o => {
+          const tieneNuevoPendiente = o.estado === 'pendiente' || 
+            (o.tiempos && o.tiempos.some(t => t.estado === 'pendiente'));
+          
+          if (tieneNuevoPendiente && !ordenesAnteriores.has(o.id + '-' + (o.ultimoTiempo || 1))) {
+            if (ordenesAnteriores.size > 0 && sonidoActivo) {
+              reproducirSonido();
+              mostrarNotificacion(o);
+            }
+            ordenesAnteriores.add(o.id + '-' + (o.ultimoTiempo || 1));
+          }
+        });
+
+        ordenes = nuevasOrdenes;
+        render();
+      }, (error) => {
+        console.log('Error en query, intentando sin orderBy:', error);
+        // Si falla, intentar query simple
+        onSnapshot(collection(db, 'ordenesRestaurante'), (snap) => {
+          ordenes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          ordenes.sort((a, b) => {
+            const fechaA = a.fechaCreacion?.toDate?.() || new Date(0);
+            const fechaB = b.fechaCreacion?.toDate?.() || new Date(0);
+            return fechaB - fechaA;
+          });
+          render();
+        });
+      });
+    }
+
+    function reproducirSonido() {
+      try {
+        // Intentar con Web Audio API primero (más confiable)
+        if (window.reproducirAlerta) {
+          window.reproducirAlerta();
+        } else {
+          // Fallback al elemento audio
+          const audio = document.getElementById('notifSound');
+          audio.currentTime = 0;
+          audio.volume = 1.0;
+          audio.play().catch(() => {});
+        }
+      } catch (e) {
+        console.log('Error reproduciendo sonido:', e);
+      }
+    }
+
+    function mostrarNotificacion(orden) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🍽️ Nueva Orden / Tiempo', {
+          body: `${orden.mesa?.nombre} - ${orden.tiempos?.length || 1} tiempo(s)`,
+          icon: '👨‍🍳'
+        });
+      }
+    }
+
+    async function cambiarEstado(ordenId, nuevoEstado) {
+      try {
+        const updates = {
+          estado: nuevoEstado,
+          fechaActualizacion: serverTimestamp()
+        };
+
+        if (nuevoEstado === 'preparando') {
+          updates.fechaInicio = serverTimestamp();
+        } else if (nuevoEstado === 'listo') {
+          updates.fechaListo = serverTimestamp();
+        }
+
+        await updateDoc(doc(db, 'ordenesRestaurante', ordenId), updates);
+      } catch (e) {
+        console.error('Error:', e);
+        alert('Error al actualizar orden');
+      }
+    }
+
+    async function eliminarOrden(ordenId) {
+      if (!confirm('¿Eliminar esta orden? Esta acción no se puede deshacer.')) return;
+      try {
+        await deleteDoc(doc(db, 'ordenesRestaurante', ordenId));
+        alert('✅ Orden eliminada');
+      } catch (e) {
+        console.error('Error:', e);
+        alert('Error al eliminar');
+      }
+    }
+
+    async function eliminarTodasLasOrdenes() {
+      if (!confirm('⚠️ ¿ELIMINAR TODAS LAS ÓRDENES?\n\nEsta acción eliminará TODAS las órdenes de prueba y no se puede deshacer.')) return;
+      if (!confirm('¿Estás SEGURO? Escribe "SI" para confirmar')) return;
+      
+      try {
+        const snap = await getDocs(collection(db, 'ordenesRestaurante'));
+        let count = 0;
+        for (const docSnap of snap.docs) {
+          await deleteDoc(doc(db, 'ordenesRestaurante', docSnap.id));
+          count++;
+        }
+        alert(`✅ Se eliminaron ${count} órdenes`);
+      } catch (e) {
+        console.error('Error:', e);
+        alert('Error al eliminar: ' + e.message);
+      }
+    }
+
+    // ========== IMPRESIÓN ==========
+    function generarTicket(orden) {
+      const fecha = orden.fechaCreacion?.toDate ? orden.fechaCreacion.toDate() : new Date();
+      
+      // Combinar todos los items de todos los tiempos
+      const todosLosItems = [];
+      if (orden.tiempos && orden.tiempos.length > 0) {
+        orden.tiempos.forEach((tiempo, idx) => {
+          todosLosItems.push({ tipo: 'header', texto: `═══ TIEMPO ${tiempo.numero} ═══` });
+          tiempo.items.forEach(item => {
+            todosLosItems.push({ tipo: 'item', ...item });
+          });
+          if (tiempo.notas) {
+            todosLosItems.push({ tipo: 'nota', texto: tiempo.notas });
+          }
+        });
+      } else if (orden.items) {
+        orden.items.forEach(item => {
+          todosLosItems.push({ tipo: 'item', ...item });
+        });
+      }
+      
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              width: 80mm;
+              padding: 3mm;
+              background: white;
+              color: black;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 8px;
+              margin-bottom: 8px;
+            }
+            .header .logo { width: 50mm; height: auto; margin-bottom: 8px; }
+            .title { font-size: 18px; font-weight: bold; }
+            .subtitle { font-size: 11px; }
+            .order-number {
+              text-align: center;
+              font-size: 36px;
+              font-weight: bold;
+              margin: 10px 0;
+              letter-spacing: 2px;
+            }
+            .mesa-box {
+              text-align: center;
+              background: #000;
+              color: #fff;
+              padding: 8px;
+              font-size: 20px;
+              font-weight: bold;
+              margin: 8px 0;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 3px 0;
+              border-bottom: 1px dotted #ccc;
+            }
+            .divider {
+              border-top: 2px dashed #000;
+              margin: 10px 0;
+            }
+            .time-header {
+              text-align: center;
+              font-weight: bold;
+              padding: 8px 0;
+              margin: 5px 0;
+              background: #f0f0f0;
+              border: 1px solid #000;
+            }
+            .item-row {
+              padding: 6px 0;
+              border-bottom: 1px dotted #ccc;
+              display: flex;
+              align-items: flex-start;
+            }
+            .item-qty {
+              font-weight: bold;
+              font-size: 16px;
+              min-width: 35px;
+            }
+            .item-name {
+              font-size: 14px;
+              flex: 1;
+            }
+            .nota-box {
+              background: #f5f5f5;
+              border-left: 3px solid #000;
+              padding: 5px 8px;
+              margin: 5px 0;
+              font-size: 11px;
+            }
+            .nota-general {
+              border: 2px solid #000;
+              padding: 8px;
+              margin: 10px 0;
+              text-align: center;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              padding-top: 10px;
+              border-top: 2px dashed #000;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <img src="${LOGO_TICKET}" alt="Jardín Escondido" class="logo">
+            <div class="title">🍽️ COMANDA COCINA</div>
+          </div>
+          
+          <div class="order-number">#${orden.numero || '---'}</div>
+          
+          <div class="mesa-box">${orden.mesa?.nombre || 'MESA'}</div>
+          
+          <div class="info-row">
+            <span>Mesero:</span>
+            <span><strong>${orden.meseroNombre || '-'}</strong></span>
+          </div>
+          <div class="info-row">
+            <span>Hora:</span>
+            <span><strong>${fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</strong></span>
+          </div>
+          <div class="info-row">
+            <span>Tiempos:</span>
+            <span><strong>${orden.tiempos?.length || 1}</strong></span>
+          </div>
+          
+          <div class="divider"></div>
+          
+          ${todosLosItems.map(item => {
+            if (item.tipo === 'header') {
+              return `<div class="time-header">${item.texto}</div>`;
+            } else if (item.tipo === 'nota') {
+              return `<div class="nota-box">📝 ${item.texto}</div>`;
+            } else {
+              return `
+                <div class="item-row">
+                  <span class="item-qty">${item.cantidad}x</span>
+                  <span class="item-name">${item.nombre}</span>
+                </div>
+              `;
+            }
+          }).join('')}
+          
+          ${orden.notas ? `
+            <div class="nota-general">
+              <strong>📝 NOTA IMPORTANTE:</strong><br>
+              ${orden.notas}
+            </div>
+          ` : ''}
+          
+          <div class="footer">
+            <div>${fecha.toLocaleDateString('es-MX')}</div>
+            <div style="margin-top: 5px;">• • •</div>
+          </div>
+        </body>
+        </html>
+      `;
+    }
+
+    function imprimirTicket(orden) {
+      const ticketHTML = generarTicket(orden);
+      
+      // Usar iframe oculto para imprimir
+      let iframe = document.getElementById('print-iframe');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'print-iframe';
+        iframe.style.cssText = 'position: fixed; right: 0; bottom: 0; width: 0; height: 0; border: 0;';
+        document.body.appendChild(iframe);
+      }
+      
+      const iframeDoc = iframe.contentWindow || iframe.contentDocument;
+      const doc = iframeDoc.document || iframeDoc;
+      
+      doc.open();
+      doc.write(ticketHTML);
+      doc.close();
+      
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          } catch (e) {
+            // Fallback: ventana emergente
+            const ventana = window.open('', '_blank', 'width=350,height=600');
+            if (ventana) {
+              ventana.document.write(ticketHTML);
+              ventana.document.close();
+              ventana.onload = () => ventana.print();
+            } else {
+              alert('Permite las ventanas emergentes para imprimir');
+            }
+          }
+        }, 300);
+      };
+    }
+
+    // ========== RENDER ==========
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (!usuario) {
+        app.innerHTML = renderLogin();
+        return;
+      }
+      
+      // Verificar si tiene permiso
+      if (usuarioData && !ROLES_PERMITIDOS.includes(usuarioData.rol)) {
+        app.innerHTML = renderAccesoDenegado();
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="min-h-screen">
+          ${renderHeader()}
+          ${vista === 'cocina' ? renderCocina() : vista === 'historial' ? renderHistorial() : renderAdmin()}
+          ${renderModalDetalle()}
+        </div>
+      `;
+    }
+
+    function renderAccesoDenegado() {
+      return `
+        <div class="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+          <div class="bg-gray-800 rounded-3xl p-8 w-full max-w-sm text-center">
+            <div class="text-5xl mb-3">🚫</div>
+            <h1 class="text-2xl font-bold text-white mb-2">Acceso Denegado</h1>
+            <p class="text-gray-400 mb-4">Esta pantalla es solo para cocina y administradores.</p>
+            <div class="bg-gray-700 rounded-xl p-4 mb-6">
+              <p class="text-sm text-gray-400">Tu rol: <strong class="text-white">${usuarioData?.rol || 'Sin rol'}</strong></p>
+            </div>
+            <button onclick="cerrarSesion()" class="text-gray-400 hover:text-white">Cerrar sesión</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLogin() {
+      return `
+        <div class="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+          <div class="bg-gray-800 rounded-3xl p-8 w-full max-w-sm">
+            <div class="text-center mb-8">
+              <div class="text-5xl mb-3">👨‍🍳</div>
+              <h1 class="text-2xl font-bold">Pantalla Cocina</h1>
+              <p class="text-gray-400">Jardín Escondido</p>
+            </div>
+            <div class="space-y-4">
+              <input id="email" type="email" placeholder="Correo electrónico" 
+                class="w-full p-4 bg-gray-700 rounded-xl text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-500" />
+              <input id="password" type="password" placeholder="Contraseña" 
+                class="w-full p-4 bg-gray-700 rounded-xl text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-500" />
+              <button onclick="iniciarSesion()" 
+                class="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold py-4 rounded-xl transition-colors">
+                Entrar a Cocina
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHeader() {
+      const pendientes = ordenes.filter(o => o.estado === 'pendiente').length;
+      const preparando = ordenes.filter(o => o.estado === 'preparando').length;
+      
+      // Contar empleados checados
+      const empleadosConEntrada = checadasHoy.filter(c => c.entrada && !c.salida).length;
+      const empleadosCompletos = checadasHoy.filter(c => c.entrada && c.salida).length;
+      const totalEmpleados = empleadosCocina.length;
+      
+      return `
+        <header class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-40">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <h1 class="text-2xl font-bold">👨‍🍳 Cocina</h1>
+              <div class="flex gap-2">
+                <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm font-medium ${pendientes > 0 ? 'ring' : ''}">
+                  ⏳ ${pendientes} pendientes
+                </span>
+                <span class="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-medium">
+                  👨‍🍳 ${preparando} preparando
+                </span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <!-- Botón de Checada Multi-empleado -->
+              <button onclick="mostrarModalChecada()" 
+                class="px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium ${
+                  empleadosConEntrada === 0 && empleadosCompletos === 0 ? 'bg-red-500 animate-pulse' : 
+                  empleadosConEntrada > 0 ? 'bg-green-600' : 'bg-gray-700'
+                }">
+                ⏰ Asistencia
+                ${totalEmpleados > 0 ? `<span class="bg-white/20 px-2 py-0.5 rounded-full text-xs">${empleadosConEntrada + empleadosCompletos}/${totalEmpleados}</span>` : ''}
+              </button>
+              <button onclick="setVista('cocina')" class="px-4 py-2 rounded-xl ${vista === 'cocina' ? 'bg-amber-500 text-black' : 'bg-gray-700'} font-medium">
+                🍳 Cocina
+              </button>
+              <button onclick="setVista('historial')" class="px-4 py-2 rounded-xl ${vista === 'historial' ? 'bg-amber-500 text-black' : 'bg-gray-700'} font-medium">
+                📋 Historial
+              </button>
+              <button onclick="setVista('admin')" class="px-4 py-2 rounded-xl ${vista === 'admin' ? 'bg-red-500 text-white' : 'bg-gray-700'} font-medium">
+                ⚙️ Admin
+              </button>
+              <div class="flex items-center gap-1 bg-gray-700 rounded-xl p-1">
+                <button onclick="toggleSonido()" class="px-3 py-2 rounded-lg ${sonidoActivo ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-400'}" title="${sonidoActivo ? 'Sonido activado' : 'Sonido desactivado'}">
+                  ${sonidoActivo ? '🔔' : '🔕'}
+                </button>
+                <button onclick="probarSonido()" class="px-3 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 text-white" title="Probar sonido">
+                  🔊
+                </button>
+              </div>
+              <button onclick="cerrarSesion()" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-xl">
+                🚪
+              </button>
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderCocina() {
+      const activas = ordenes.filter(o => !['pagado', 'cancelado', 'entregado'].includes(o.estado));
+      
+      if (activas.length === 0) {
+        return `
+          <div class="flex items-center justify-center h-[80vh]">
+            <div class="text-center">
+              <div class="text-8xl mb-4">✨</div>
+              <p class="text-2xl text-gray-400">Sin órdenes pendientes</p>
+              <p class="text-gray-500">Las órdenes aparecerán aquí automáticamente</p>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          ${activas.map(o => {
+            const tiemposPendientes = (o.tiempos || []).filter(t => t.estado === 'pendiente').length;
+            const urgente = tiempoTranscurrido(o.fechaCreacion).includes('h') || 
+                           parseInt(tiempoTranscurrido(o.fechaCreacion)) > 15;
+            
+            return `
+              <div class="slide-in bg-gray-800 rounded-2xl overflow-hidden ${
+                o.estado === 'listo' ? 'ring-4 ring-green-500 glow-green' : 
+                o.estado === 'preparando' ? 'ring-2 ring-blue-500' : 
+                urgente ? 'ring-2 ring-red-500 shake' : ''
+              }">
+                <!-- Header de la orden -->
+                <div class="p-4 ${
+                  o.estado === 'listo' ? 'bg-green-500' : 
+                  o.estado === 'preparando' ? 'bg-blue-500' : 
+                  'bg-yellow-500'
+                } text-black">
+                  <div class="flex justify-between items-start">
+                    <div>
+                      <p class="text-3xl font-black">#${o.numero}</p>
+                      <p class="text-xl font-bold">${o.mesa?.nombre}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="font-bold">${tiempoTranscurrido(o.fechaCreacion)}</p>
+                      <p class="text-sm opacity-75">${o.tiempos?.length || 1} tiempo(s)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Items por tiempo -->
+                <div class="p-4 max-h-64 overflow-y-auto">
+                  ${(o.tiempos && o.tiempos.length > 0) ? o.tiempos.map((tiempo, idx) => `
+                    <div class="mb-3 ${idx > 0 ? 'border-t border-gray-700 pt-3' : ''}">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold ${tiempo.estado === 'pendiente' ? 'text-yellow-400' : 'text-green-400'}">
+                          ⏱️ TIEMPO ${tiempo.numero}
+                        </span>
+                        <span class="text-xs text-gray-500">
+                          ${new Date(tiempo.hora).toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit'})}
+                        </span>
+                      </div>
+                      ${tiempo.items.map(i => `
+                        <div class="flex items-center gap-2 py-1">
+                          <span class="w-8 h-8 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-lg">${i.cantidad}</span>
+                          <span class="font-medium">${i.nombre}</span>
+                        </div>
+                      `).join('')}
+                      ${tiempo.notas ? `<p class="text-xs text-amber-400 mt-2 bg-amber-500/10 p-2 rounded">📝 ${tiempo.notas}</p>` : ''}
+                    </div>
+                  `).join('') : `
+                    ${(o.items || []).map(i => `
+                      <div class="flex items-center gap-2 py-1">
+                        <span class="w-8 h-8 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-lg">${i.cantidad}</span>
+                        <span class="font-medium">${i.nombre}</span>
+                      </div>
+                    `).join('')}
+                    ${o.notas ? `<p class="text-xs text-amber-400 mt-2 bg-amber-500/10 p-2 rounded">📝 ${o.notas}</p>` : ''}
+                  `}
+                </div>
+
+                <!-- Info mesero -->
+                <div class="px-4 py-2 bg-gray-700/50 text-sm text-gray-400">
+                  👤 ${o.meseroNombre || 'Mesero'}
+                </div>
+
+                <!-- Acciones -->
+                <div class="p-3 bg-gray-900 flex gap-2">
+                  <button onclick="verDetalle('${o.id}')" class="flex-1 bg-gray-700 hover:bg-gray-600 py-3 rounded-xl font-medium">
+                    👁️ Ver
+                  </button>
+                  ${o.estado === 'pendiente' ? `
+                    <button onclick="iniciarPreparacion('${o.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold">
+                      👨‍🍳 Iniciar
+                    </button>
+                  ` : o.estado === 'preparando' ? `
+                    <button onclick="marcarListo('${o.id}')" class="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded-xl font-bold">
+                      ✅ ¡Listo!
+                    </button>
+                  ` : `
+                    <button class="flex-1 bg-green-500 py-3 rounded-xl font-bold text-black cursor-default">
+                      🎉 LISTO
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderHistorial() {
+      const historial = ordenes.filter(o => ['pagado', 'entregado', 'cancelado'].includes(o.estado)).slice(0, 50);
+      
+      return `
+        <div class="p-6">
+          <h2 class="text-2xl font-bold mb-6">📋 Historial de Órdenes</h2>
+          
+          ${historial.length === 0 ? `
+            <div class="text-center text-gray-400 py-12">
+              <p class="text-4xl mb-2">📋</p>
+              <p>Sin historial</p>
+            </div>
+          ` : `
+            <div class="bg-gray-800 rounded-2xl overflow-hidden">
+              <table class="w-full">
+                <thead class="bg-gray-700">
+                  <tr>
+                    <th class="px-4 py-3 text-left">Orden</th>
+                    <th class="px-4 py-3 text-left">Mesa</th>
+                    <th class="px-4 py-3 text-left">Mesero</th>
+                    <th class="px-4 py-3 text-left">Tiempos</th>
+                    <th class="px-4 py-3 text-left">Total</th>
+                    <th class="px-4 py-3 text-left">Estado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                  ${historial.map(o => `
+                    <tr class="hover:bg-gray-700/50">
+                      <td class="px-4 py-3 font-bold">#${o.numero}</td>
+                      <td class="px-4 py-3">${o.mesa?.nombre || '-'}</td>
+                      <td class="px-4 py-3">${o.meseroNombre || '-'}</td>
+                      <td class="px-4 py-3">${o.tiempos?.length || 1}</td>
+                      <td class="px-4 py-3 font-semibold">${fmt(o.total)}</td>
+                      <td class="px-4 py-3">
+                        <span class="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
+                          ✓ ${o.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderAdmin() {
+      return `
+        <div class="p-6 max-w-2xl mx-auto">
+          <h2 class="text-2xl font-bold mb-6">⚙️ Panel de Administración</h2>
+          
+          <div class="bg-gray-800 rounded-2xl p-6 mb-6">
+            <h3 class="text-lg font-bold mb-4 text-yellow-400">⚠️ Zona de Pruebas</h3>
+            <p class="text-gray-400 mb-4">Estas opciones son para limpiar datos de prueba durante el desarrollo.</p>
+            
+            <div class="space-y-4">
+              <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                <h4 class="font-bold text-red-400 mb-2">🗑️ Eliminar Todas las Órdenes</h4>
+                <p class="text-sm text-gray-400 mb-3">Elimina TODAS las órdenes del sistema. Úsalo solo para limpiar datos de prueba.</p>
+                <button onclick="eliminarTodasBtn()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-medium">
+                  Eliminar Todas las Órdenes
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gray-800 rounded-2xl p-6">
+            <h3 class="text-lg font-bold mb-4">📊 Estadísticas</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Total Órdenes</p>
+                <p class="text-3xl font-bold">${ordenes.length}</p>
+              </div>
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Activas</p>
+                <p class="text-3xl font-bold text-yellow-400">${ordenes.filter(o => !['pagado', 'cancelado', 'entregado'].includes(o.estado)).length}</p>
+              </div>
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Completadas</p>
+                <p class="text-3xl font-bold text-green-400">${ordenes.filter(o => ['pagado', 'entregado'].includes(o.estado)).length}</p>
+              </div>
+              <div class="bg-gray-700 rounded-xl p-4">
+                <p class="text-gray-400 text-sm">Canceladas</p>
+                <p class="text-3xl font-bold text-red-400">${ordenes.filter(o => o.estado === 'cancelado').length}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lista de órdenes para eliminar individualmente -->
+          <div class="bg-gray-800 rounded-2xl p-6 mt-6">
+            <h3 class="text-lg font-bold mb-4">🗑️ Eliminar Órdenes Individuales</h3>
+            <div class="space-y-2 max-h-96 overflow-y-auto">
+              ${ordenes.map(o => `
+                <div class="flex items-center justify-between bg-gray-700 rounded-xl p-3">
+                  <div>
+                    <span class="font-bold">#${o.numero}</span>
+                    <span class="text-gray-400 ml-2">${o.mesa?.nombre}</span>
+                    <span class="text-xs ml-2 px-2 py-0.5 rounded ${
+                      o.estado === 'pendiente' ? 'bg-yellow-500/20 text-yellow-400' :
+                      o.estado === 'preparando' ? 'bg-blue-500/20 text-blue-400' :
+                      o.estado === 'listo' ? 'bg-green-500/20 text-green-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }">${o.estado}</span>
+                  </div>
+                  <button onclick="eliminarOrdenBtn('${o.id}')" class="p-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm">
+                    🗑️
+                  </button>
+                </div>
+              `).join('') || '<p class="text-gray-400 text-center">No hay órdenes</p>'}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderModalDetalle() {
+      const o = ordenSeleccionada;
+      if (!o) return '';
+
+      return `
+        <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="cerrarDetalle()">
+          <div class="bg-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
+            <div class="p-6 border-b border-gray-700 flex items-center justify-between">
+              <div>
+                <p class="text-4xl font-black">#${o.numero}</p>
+                <p class="text-xl text-amber-400">${o.mesa?.nombre}</p>
+              </div>
+              <button onclick="cerrarDetalle()" class="p-3 hover:bg-gray-700 rounded-xl text-2xl">✕</button>
+            </div>
+            
+            <div class="p-6">
+              <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="bg-gray-700 rounded-xl p-4">
+                  <p class="text-gray-400 text-sm">Mesero</p>
+                  <p class="font-semibold">${o.meseroNombre || '-'}</p>
+                </div>
+                <div class="bg-gray-700 rounded-xl p-4">
+                  <p class="text-gray-400 text-sm">Tiempo</p>
+                  <p class="font-semibold">${tiempoTranscurrido(o.fechaCreacion)}</p>
+                </div>
+                <div class="bg-gray-700 rounded-xl p-4">
+                  <p class="text-gray-400 text-sm">Tiempos</p>
+                  <p class="font-semibold">${o.tiempos?.length || 1}</p>
+                </div>
+              </div>
+
+              <h3 class="font-bold mb-3">Productos por Tiempo</h3>
+              <div class="space-y-4 mb-6">
+                ${(o.tiempos && o.tiempos.length > 0) ? o.tiempos.map((tiempo, idx) => `
+                  <div class="bg-gray-700 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="font-bold text-amber-400">⏱️ Tiempo ${tiempo.numero}</span>
+                      <span class="text-sm text-gray-400">${new Date(tiempo.hora).toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit'})}</span>
+                    </div>
+                    ${tiempo.items.map(i => `
+                      <div class="flex items-center gap-3 py-2">
+                        <span class="w-10 h-10 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-xl">${i.cantidad}</span>
+                        <span class="text-lg">${i.nombre}</span>
+                      </div>
+                    `).join('')}
+                    ${tiempo.notas ? `<p class="text-amber-400 text-sm mt-2 bg-amber-500/10 p-2 rounded">📝 ${tiempo.notas}</p>` : ''}
+                  </div>
+                `).join('') : `
+                  <div class="bg-gray-700 rounded-xl p-4">
+                    ${(o.items || []).map(i => `
+                      <div class="flex items-center gap-3 py-2">
+                        <span class="w-10 h-10 bg-amber-500 text-black rounded-lg flex items-center justify-center font-black text-xl">${i.cantidad}</span>
+                        <span class="text-lg">${i.nombre}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                `}
+              </div>
+
+              <div class="flex items-center justify-between p-4 bg-gray-700 rounded-xl mb-6">
+                <span class="text-lg">Total:</span>
+                <span class="text-2xl font-bold text-amber-400">${fmt(o.total)}</span>
+              </div>
+
+              <div class="flex gap-3">
+                <button onclick="imprimirOrden('${o.id}')" class="flex-1 bg-gray-700 hover:bg-gray-600 py-4 rounded-xl font-bold">
+                  🖨️ Imprimir
+                </button>
+                ${o.estado === 'pendiente' ? `
+                  <button onclick="iniciarPreparacion('${o.id}'); cerrarDetalle();" class="flex-1 bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-bold">
+                    👨‍🍳 Iniciar
+                  </button>
+                ` : o.estado === 'preparando' ? `
+                  <button onclick="marcarListo('${o.id}'); cerrarDetalle();" class="flex-1 bg-green-600 hover:bg-green-700 py-4 rounded-xl font-bold">
+                    ✅ ¡Listo!
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ========== ACCIONES ==========
+    window.iniciarSesion = async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        if ('Notification' in window) {
+          Notification.requestPermission();
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    };
+
+    // ========== FUNCIONES DE CHECADA MULTI-EMPLEADO ==========
+    async function cargarEmpleadosCocina() {
+      try {
+        const snap = await getDocs(collection(db, 'empleados'));
+        empleadosCocina = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(e => PUESTOS_COCINA.includes(e.puesto) && e.activo !== false);
+        console.log('Empleados de cocina cargados:', empleadosCocina.length);
+      } catch (e) {
+        console.error('Error cargando empleados:', e);
+        empleadosCocina = [];
+      }
+    }
+
+    async function cargarChecadasHoy() {
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      try {
+        const q = query(
+          collection(db, 'checadas'),
+          where('fecha', '==', hoy),
+          where('app', '==', 'cocina')
+        );
+        const snap = await getDocs(q);
+        checadasHoy = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+      } catch (e) {
+        console.error('Error cargando checadas:', e);
+        checadasHoy = [];
+      }
+    }
+
+    // Mantener compatibilidad con código anterior
+    async function cargarChecadaHoy() {
+      await cargarEmpleadosCocina();
+      await cargarChecadasHoy();
+    }
+
+    window.mostrarModalChecada = () => {
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      
+      const modal = document.createElement('div');
+      modal.id = 'modal-checada';
+      modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto';
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      
+      // Obtener checada de cada empleado
+      const empleadosConChecada = empleadosCocina.map(emp => {
+        const checada = checadasHoy.find(c => c.empleadoId === emp.id);
+        return { ...emp, checada };
+      });
+      
+      modal.innerHTML = `
+        <div class="bg-gray-800 rounded-3xl p-6 w-full max-w-md border border-gray-700 my-4">
+          <div class="text-center mb-6">
+            <div class="text-5xl mb-2">👨‍🍳</div>
+            <h2 class="text-xl font-bold text-white">Asistencia de Cocina</h2>
+            <p class="text-gray-400">${new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <p class="text-amber-400 text-sm mt-1">🕐 ${horaActual}</p>
+          </div>
+          
+          ${empleadosCocina.length === 0 ? `
+            <div class="bg-yellow-500/20 rounded-xl p-4 mb-4 text-center">
+              <p class="text-yellow-400">No hay empleados de cocina registrados</p>
+              <p class="text-gray-400 text-sm mt-2">Agrega empleados con puesto de Chef, Cocinero o Ayudante de Cocina en el sistema principal.</p>
+            </div>
+          ` : `
+            <div class="space-y-3 max-h-[60vh] overflow-y-auto mb-4">
+              ${empleadosConChecada.map(emp => {
+                const checada = emp.checada;
+                const tieneEntrada = !!checada?.entrada;
+                const tieneSalida = !!checada?.salida;
+                
+                return `
+                  <div class="bg-gray-700 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold">
+                          ${emp.nombre?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div>
+                          <p class="font-semibold text-white">${emp.nombre || 'Sin nombre'}</p>
+                          <p class="text-xs text-gray-400">${emp.puesto === 'chef' ? '👨‍🍳 Chef' : emp.puesto === 'cocinero' ? '🍳 Cocinero' : '🥄 Ayudante'}</p>
+                        </div>
+                      </div>
+                      <div class="text-right">
+                        ${tieneEntrada ? `
+                          <span class="text-green-400 font-mono">${checada.entrada}</span>
+                          ${tieneSalida ? `<span class="text-blue-400 font-mono ml-2">→ ${checada.salida}</span>` : ''}
+                        ` : `
+                          <span class="text-gray-500 text-sm">Sin registro</span>
+                        `}
+                      </div>
+                    </div>
+                    <div class="flex gap-2">
+                      ${!tieneEntrada ? `
+                        <button onclick="registrarEntradaEmpleado('${emp.id}', '${emp.nombre}')" 
+                          class="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 rounded-lg text-sm">
+                          ✅ Entrada
+                        </button>
+                      ` : !tieneSalida ? `
+                        <button onclick="registrarSalidaEmpleado('${emp.id}', '${checada?.id}')" 
+                          class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-lg text-sm">
+                          🚪 Salida
+                        </button>
+                      ` : `
+                        <div class="flex-1 text-center text-green-400 text-sm py-2">
+                          ✅ Jornada completada
+                        </div>
+                      `}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+          
+          <div class="space-y-3">
+            <button onclick="agregarEmpleadoTemporal()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium py-3 rounded-xl">
+              ➕ Agregar empleado temporal
+            </button>
+            <button onclick="document.getElementById('modal-checada').remove()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 rounded-xl">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    };
+
+    window.registrarEntradaEmpleado = async (empleadoId, empleadoNombre) => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        const docRef = await addDoc(collection(db, 'checadas'), {
+          empleadoId,
+          empleadoNombre,
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null,
+          app: 'cocina',
+          fechaCreacion: serverTimestamp()
+        });
+        
+        checadasHoy.push({
+          id: docRef.id,
+          empleadoId,
+          empleadoNombre,
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null
+        });
+        
+        document.getElementById('modal-checada')?.remove();
+        mostrarModalChecada(); // Reabrir para actualizar
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      } catch (e) {
+        alert('Error al registrar entrada: ' + e.message);
+      }
+    };
+
+    window.registrarSalidaEmpleado = async (empleadoId, checadaId) => {
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      try {
+        await updateDoc(doc(db, 'checadas', checadaId), {
+          salida: horaActual,
+          fechaSalida: serverTimestamp()
+        });
+        
+        // Actualizar en memoria
+        const idx = checadasHoy.findIndex(c => c.id === checadaId);
+        if (idx >= 0) {
+          checadasHoy[idx].salida = horaActual;
+        }
+        
+        document.getElementById('modal-checada')?.remove();
+        mostrarModalChecada(); // Reabrir para actualizar
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
+      } catch (e) {
+        alert('Error al registrar salida: ' + e.message);
+      }
+    };
+
+    window.agregarEmpleadoTemporal = () => {
+      const nombre = prompt('Nombre del empleado temporal:');
+      if (!nombre || !nombre.trim()) return;
+      
+      const horaActual = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const hoy = new Date().toISOString().slice(0, 10);
+      
+      // Generar ID temporal
+      const tempId = 'temp-' + Date.now();
+      
+      addDoc(collection(db, 'checadas'), {
+        empleadoId: tempId,
+        empleadoNombre: nombre.trim(),
+        fecha: hoy,
+        entrada: horaActual,
+        salida: null,
+        app: 'cocina',
+        temporal: true,
+        fechaCreacion: serverTimestamp()
+      }).then((docRef) => {
+        checadasHoy.push({
+          id: docRef.id,
+          empleadoId: tempId,
+          empleadoNombre: nombre.trim(),
+          fecha: hoy,
+          entrada: horaActual,
+          salida: null,
+          temporal: true
+        });
+        
+        // Agregar a la lista temporal para mostrar en el modal
+        empleadosCocina.push({
+          id: tempId,
+          nombre: nombre.trim(),
+          puesto: 'ayudante-cocina',
+          temporal: true
+        });
+        
+        document.getElementById('modal-checada')?.remove();
+        mostrarModalChecada();
+        
+        alert('✅ ' + nombre.trim() + ' registrado: ' + horaActual);
+      }).catch(e => {
+        alert('Error: ' + e.message);
+      });
+    };
+
+    window.cerrarSesion = async () => {
+      if (confirm('¿Cerrar sesión?')) {
+        await signOut(auth);
+      }
+    };
+
+    window.setVista = (v) => { vista = v; render(); };
+    window.toggleSonido = () => { 
+      sonidoActivo = !sonidoActivo; 
+      if (sonidoActivo) reproducirSonido();
+      render(); 
+    };
+    window.probarSonido = () => {
+      reproducirSonido();
+    };
+
+    window.verDetalle = (id) => {
+      ordenSeleccionada = ordenes.find(o => o.id === id);
+      render();
+    };
+
+    window.cerrarDetalle = () => {
+      ordenSeleccionada = null;
+      render();
+    };
+
+    window.iniciarPreparacion = (id) => cambiarEstado(id, 'preparando');
+    window.marcarListo = (id) => cambiarEstado(id, 'listo');
+
+    window.imprimirOrden = (id) => {
+      const orden = ordenes.find(o => o.id === id);
+      if (orden) {
+        imprimirTicket(orden);
+      }
+    };
+
+    window.eliminarOrdenBtn = (id) => eliminarOrden(id);
+    window.eliminarTodasBtn = () => eliminarTodasLasOrdenes();
+
+    setInterval(() => render(), 60000);
+
+    // ========== AUTH ==========
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        usuario = { uid: user.uid, email: user.email };
+        
+        // Cargar datos del usuario desde Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+          if (userDoc.exists()) {
+            usuarioData = userDoc.data();
+          } else {
+            usuarioData = { rol: 'cocina' }; // Asumir cocina si no hay documento
+          }
+        } catch (e) {
+          console.error('Error cargando datos de usuario:', e);
+          usuarioData = { rol: 'cocina' };
+        }
+        
+        // Solo cargar datos si tiene permiso
+        if (ROLES_PERMITIDOS.includes(usuarioData?.rol)) {
+          escucharOrdenes();
+          await cargarChecadaHoy(); // Carga empleados de cocina y sus checadas
+        }
+      } else {
+        usuario = null;
+        usuarioData = null;
+        ordenes = [];
+        checadaHoy = null;
+        empleadosCocina = [];
+        checadasHoy = [];
+      }
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
