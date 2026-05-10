@@ -9,18 +9,16 @@
   <style>
     * { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
     body { overscroll-behavior: none; background: #f3f4f6; }
+    html, body { height: 100%; overflow: hidden; }
+    #app { height: 100%; }
+    .app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .app-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
     .pulse-ring::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid currentColor; animation: pulse-ring 1.5s ease-out infinite; }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    .slide-up { animation: slideUp 0.2s ease-out; }
-
-    /* ── Layout pantalla restaurante ── */
-    html, body { height: 100%; overflow: hidden; }
-    #app { height: 100%; }
-    .app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-    .app-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .slide-up { animation: slideUp 0.3s ease-out; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -65,6 +63,7 @@
     let todasLasOrdenes = []; // Todas las órdenes activas (para ver mesas ocupadas)
     let categoriaActiva = 'Todos';
     let busqueda = '';
+    let nombreMeseroActual = '';
     let checadaHoy = null; // Checada del día actual
 
     // Roles permitidos para esta app
@@ -199,7 +198,7 @@
         const qSimple = query(collection(db, 'ordenesRestaurante'));
         onSnapshot(qSimple, (snap) => {
           todasLasOrdenes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          ordenes = todasLasOrdenes; // todos ven todas las órdenes
+          ordenes = todasLasOrdenes;
           render();
         });
       });
@@ -230,7 +229,7 @@
             numero: tiempoActual,
             items: ordenActual.items,
             notas: ordenActual.notas,
-            meseroNombre: mesero?.nombre || usuario?.email?.split('@')[0] || 'Mesero',
+            meseroNombre: nombreMeseroActual || mesero?.nombre || usuario?.email?.split('@')[0] || 'Mesero',
             hora: new Date().toISOString(),
             estado: 'pendiente' // cada tiempo tiene su estado
           };
@@ -253,40 +252,43 @@
           alert(`✅ Tiempo ${tiempoActual} agregado a ${mesaSeleccionada.nombre}`);
           
         } else {
-          // CREAR NUEVA ORDEN
-          const orden = {
-            mesa: mesaSeleccionada,
-            meseroId: mesero?.id || usuario?.uid || 'mesero1',
-            meseroNombre: mesero?.nombre || usuario?.email?.split('@')[0] || 'Mesero',
-            tiempos: [{
-              numero: 1,
-              items: ordenActual.items,
-              notas: ordenActual.notas,
-              meseroNombre: mesero?.nombre || usuario?.email?.split('@')[0] || 'Mesero',
-              hora: new Date().toISOString(),
-              estado: 'pendiente'
-            }],
-            // Items planos para compatibilidad
-            items: ordenActual.items,
-            total: totalOrden(),
-            notas: ordenActual.notas,
-            estado: 'pendiente',
-            fechaCreacion: serverTimestamp(),
-            fechaActualizacion: serverTimestamp(),
-            numero: Math.floor(Math.random() * 9000) + 1000,
-            ultimoTiempo: 1
-          };
+          const itemsComida  = ordenActual.items.filter(i => !esBebidaFn(i));
+          const itemsBebida  = ordenActual.items.filter(i => esBebidaFn(i));
+          const meseroNomOrd = nombreMeseroActual || mesero?.nombre || usuario?.email?.split('@')[0] || 'Mesero';
+          const numOrden     = Math.floor(Math.random() * 9000) + 1000;
 
-          const id = genId();
-          await setDoc(doc(db, 'ordenesRestaurante', id), orden);
-          
+          if (itemsComida.length > 0) {
+            const ordenComida = {
+              mesa: mesaSeleccionada, meseroId: mesero?.id || usuario?.uid || 'mesero1', meseroNombre: meseroNomOrd,
+              tiempos: [{ numero:1, items:itemsComida, notas:ordenActual.notas, meseroNombre:meseroNomOrd, hora:new Date().toISOString(), estado:'pendiente' }],
+              items: itemsComida, total: itemsComida.reduce((s,i) => s+(i.precioFinal||i.precio)*i.cantidad, 0),
+              notas: ordenActual.notas, estado: 'pendiente', tipo: 'comida',
+              fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp(), numero: numOrden, ultimoTiempo: 1
+            };
+            await setDoc(doc(db, 'ordenesRestaurante', genId()), ordenComida);
+          }
+          if (itemsBebida.length > 0) {
+            const ordenBebida = {
+              mesa: mesaSeleccionada, meseroId: mesero?.id || usuario?.uid || 'mesero1', meseroNombre: meseroNomOrd,
+              tiempos: [{ numero:1, items:itemsBebida, notas:'', meseroNombre:meseroNomOrd, hora:new Date().toISOString(), estado:'entregado' }],
+              items: itemsBebida, total: itemsBebida.reduce((s,i) => s+(i.precioFinal||i.precio)*i.cantidad, 0),
+              notas: '', estado: 'listo', tipo: 'bebida',
+              fechaCreacion: serverTimestamp(), fechaActualizacion: serverTimestamp(), numero: numOrden, ultimoTiempo: 1
+            };
+            await setDoc(doc(db, 'ordenesRestaurante', genId()), ordenBebida);
+          }
           if (navigator.vibrate) navigator.vibrate(200);
-          alert('✅ Orden enviada a cocina');
+          const msgEnvio = itemsComida.length && itemsBebida.length
+            ? '✅ Comanda enviada a cocina\n🥤 ' + itemsBebida.length + ' bebida(s) registradas'
+            : itemsComida.length ? '✅ Orden enviada a cocina'
+            : '🥤 ' + itemsBebida.length + ' bebida(s) registradas';
+          alert(msgEnvio);
         }
         
         // Limpiar orden actual
         ordenActual = { items: [], mesa: null, notas: '' };
         mesaSeleccionada = null;
+        nombreMeseroActual = '';
         vista = 'mesas';
         render();
         
@@ -313,8 +315,16 @@
     function render() {
       const app = document.getElementById('app');
       
-      if (!usuario) { app.innerHTML = renderLogin(); return; }
-      if (usuarioData && !ROLES_PERMITIDOS.includes(usuarioData.rol)) { app.innerHTML = renderAccesoDenegado(); return; }
+      if (!usuario) {
+        app.innerHTML = renderLogin();
+        return;
+      }
+      
+      // Verificar si tiene permiso
+      if (usuarioData && !ROLES_PERMITIDOS.includes(usuarioData.rol)) {
+        app.innerHTML = renderAccesoDenegado();
+        return;
+      }
 
       let contenido = '';
       if (vista === 'mesas') contenido = renderMesas();
@@ -379,19 +389,19 @@
       return `
         <header class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 z-40 flex-shrink-0">
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <span class="text-lg">🍽️</span>
-              <div>
-                <p class="font-bold text-sm leading-tight">Jardín Escondido</p>
-                <p class="text-amber-100 text-xs">${mesero?.nombre || usuario?.email}</p>
-              </div>
+            <div>
+              <h1 class="font-bold text-sm leading-tight">🍽️ Jardín Escondido</h1>
+              <p class="text-amber-100 text-xs">${mesero?.nombre || usuario?.email}</p>
             </div>
             <div class="flex items-center gap-2">
+              <!-- Botón de Checada -->
               <button onclick="mostrarModalChecada()" 
-                class="px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-medium ${horaEntrada ? (horaSalida ? 'bg-green-600' : 'bg-white/20') : 'bg-red-500 animate-pulse'}">
+                class="p-2 rounded-xl flex items-center gap-1 text-sm ${horaEntrada ? (horaSalida ? 'bg-green-600' : 'bg-white/20') : 'bg-red-500 animate-pulse'}">
                 ${!horaEntrada ? '⏰ Entrada' : horaSalida ? '✅ ' + horaEntrada : '🕐 ' + horaEntrada}
               </button>
-              <button onclick="cerrarSesion()" class="p-1 hover:bg-white/20 rounded-lg text-sm">🚪</button>
+              <button onclick="cerrarSesion()" class="p-2 hover:bg-white/20 rounded-xl">
+                🚪
+              </button>
             </div>
           </div>
         </header>
@@ -404,7 +414,7 @@
       return `
         <div class="overflow-y-auto h-full p-3 pb-14 no-scrollbar">
           ${zonas.map(zona => `
-            <div class="mb-3">
+            <div>
               <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">${zona}</h2>
               <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
                 ${MESAS.filter(m => m.zona === zona).map(mesa => {
@@ -415,22 +425,22 @@
                   
                   return `
                     <button onclick="seleccionarMesa(${mesa.id})" 
-                      class="relative p-2 rounded-xl text-center transition-all active:scale-95 ${
+                      class="relative p-4 rounded-2xl text-center transition-all active:scale-95 ${
                         tieneOrden 
                           ? estaLista 
-                            ? 'bg-green-500 text-white ring-2 ring-green-300' 
+                            ? 'bg-green-500 text-white ring-4 ring-green-300' 
                             : 'bg-amber-500 text-white' 
-                          : 'bg-white text-gray-700 shadow-sm'
+                          : 'bg-white text-gray-700 hover:shadow-lg'
                       }">
-                      <p class="text-xl mb-0.5">${tieneOrden ? '🍽️' : '🪑'}</p>
-                      <p class="font-bold text-xs">${mesa.nombre}</p>
+                      <p class="text-2xl mb-1">${tieneOrden ? '🍽️' : '🪑'}</p>
+                      <p class="font-bold text-sm">${mesa.nombre}</p>
                       ${tieneOrden ? `
-                        <p class="text-xs opacity-80">${tiempos}t</p>
-                        ${estaLista ? '<p class="text-xs font-bold">¡LISTO!</p>' : ''}
+                        <p class="text-xs opacity-80">${tiempos} tiempo${tiempos > 1 ? 's' : ''}</p>
+                        ${estaLista ? '<p class="text-xs font-bold mt-1">¡LISTO!</p>' : ''}
                       ` : `
-                        <p class="text-xs text-gray-400">${mesa.capacidad > 0 ? mesa.capacidad + 'p' : ''}</p>
+                        <p class="text-xs text-gray-400">${mesa.capacidad > 0 ? mesa.capacidad + ' pers.' : ''}</p>
                       `}
-                      ${estaLista ? '<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-300 rounded-full animate-ping"></span>' : ''}
+                      ${estaLista ? '<span class="absolute -top-1 -right-1 w-4 h-4 bg-green-300 rounded-full animate-ping"></span>' : ''}
                     </button>
                   `;
                 }).join('')}
@@ -443,20 +453,13 @@
 
     function renderOrden() {
       const ordenExistente = mesaSeleccionada ? buscarOrdenAbiertaMesa(mesaSeleccionada.id) : null;
-      // Filtrar por categoría y búsqueda
-      let productosFiltrados = categoriaActiva === 'Todos'
-        ? productos
-        : productos.filter(p => p.categoria === categoriaActiva);
+      let productosFiltrados = categoriaActiva === 'Todos' ? productos : productos.filter(p => p.categoria === categoriaActiva);
       if (busqueda) {
-        productosFiltrados = productosFiltrados.filter(p =>
-          p.nombre.toLowerCase().includes(busqueda.toLowerCase())
-        );
+        productosFiltrados = productosFiltrados.filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
       }
-
       return `
         <div class="flex h-full overflow-hidden">
-
-          <!-- ── PANEL IZQUIERDO: productos ── -->
+          <!-- Panel izquierdo: productos -->
           <div class="flex-1 flex flex-col overflow-hidden border-r border-gray-200">
             <div class="px-3 py-1.5 bg-white border-b flex items-center justify-between flex-shrink-0">
               <button onclick="volverMesas()" class="text-gray-500 text-sm">← Mesas</button>
@@ -466,9 +469,9 @@
               </div>
               <div class="w-14"></div>
             </div>
-            <!-- Categorías con scroll por botones -->
+            <!-- Categorías con flechas -->
             <div class="bg-gray-50 flex-shrink-0 flex items-center gap-1 px-1 py-1.5">
-              <button onclick="scrollCats(-1)" class="w-6 h-6 bg-white rounded-full shadow text-gray-500 flex items-center justify-center flex-shrink-0 text-xs hover:bg-amber-100">‹</button>
+              <button onclick="scrollCats(-1)" class="w-6 h-6 bg-white rounded-full shadow text-gray-500 flex items-center justify-center flex-shrink-0 text-xs">‹</button>
               <div id="cats-scroll" class="flex gap-1.5 overflow-x-auto no-scrollbar flex-1" style="scroll-behavior:smooth">
                 ${categorias.map(cat => `
                   <button onclick="setCategoria('${cat}')"
@@ -477,29 +480,21 @@
                   </button>
                 `).join('')}
               </div>
-              <button onclick="scrollCats(1)" class="w-6 h-6 bg-white rounded-full shadow text-gray-500 flex items-center justify-center flex-shrink-0 text-xs hover:bg-amber-100">›</button>
+              <button onclick="scrollCats(1)" class="w-6 h-6 bg-white rounded-full shadow text-gray-500 flex items-center justify-center flex-shrink-0 text-xs">›</button>
             </div>
             <!-- Buscador -->
             <div class="px-2 pb-1.5 bg-gray-50 flex-shrink-0">
               <div class="relative">
                 <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
-                <input
-                  type="text"
-                  placeholder="Buscar producto..."
-                  value="${busqueda}"
+                <input type="text" placeholder="Buscar producto..." value="${busqueda}"
                   oninput="setBusqueda(this.value)"
-                  class="w-full pl-7 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-amber-400"
-                />
-                ${busqueda ? '<button onclick="setBusqueda(\'\')" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm font-bold">✕</button>' : ''}
+                  class="w-full pl-7 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-amber-400" />
+                ${busqueda ? '<button onclick="setBusqueda(\'\')" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">✕</button>' : ''}
               </div>
             </div>
+            <!-- Grid de productos -->
             <div class="flex-1 overflow-y-auto p-2 no-scrollbar">
-              ${productosFiltrados.length === 0 ? `
-                <div class="flex flex-col items-center justify-center h-32 text-gray-400 text-center">
-                  <p class="text-2xl mb-1">🔍</p>
-                  <p class="text-xs">Sin resultados para "${busqueda}"</p>
-                </div>
-              ` : ''}
+              ${productosFiltrados.length === 0 ? `<div class="flex flex-col items-center justify-center h-32 text-gray-400 text-center"><p class="text-2xl mb-1">🔍</p><p class="text-xs">Sin resultados para "${busqueda}"</p></div>` : ''}
               <div class="grid grid-cols-3 md:grid-cols-4 gap-2">
                 ${productosFiltrados.map(p => {
                   const cantidadTotal = ordenActual.items.filter(i => i.id === p.id).reduce((s, i) => s + i.cantidad, 0);
@@ -517,20 +512,14 @@
               </div>
             </div>
           </div>
-
-          <!-- ── PANEL DERECHO: carrito ── -->
+          <!-- Panel derecho: carrito -->
           <div class="w-60 flex flex-col bg-white overflow-hidden flex-shrink-0">
             <div class="px-3 py-1.5 bg-amber-50 border-b flex-shrink-0">
               <p class="font-bold text-sm text-amber-800">🛒 Orden</p>
               ${ordenExistente ? `<p class="text-xs text-amber-600">Tiempo ${(ordenExistente.tiempos?.length || 0) + 1}</p>` : ''}
             </div>
             <div class="flex-1 overflow-y-auto no-scrollbar p-2 space-y-1">
-              ${ordenActual.items.length === 0 ? `
-                <div class="flex flex-col items-center justify-center h-full text-gray-300 text-center">
-                  <p class="text-2xl mb-1">🛒</p>
-                  <p class="text-xs">Agrega productos</p>
-                </div>
-              ` : ordenActual.items.map(item => `
+              ${ordenActual.items.length === 0 ? `<div class="flex flex-col items-center justify-center h-full text-gray-300 text-center"><p class="text-2xl mb-1">🛒</p><p class="text-xs">Agrega productos</p></div>` : ordenActual.items.map(item => `
                 <div class="bg-gray-50 rounded-lg p-1.5">
                   <div class="flex items-center gap-1">
                     <button onclick="cambiarCantidad('${item.itemId}', -1)" class="w-6 h-6 bg-gray-200 rounded-full font-bold text-xs flex items-center justify-center flex-shrink-0">-</button>
@@ -554,9 +543,7 @@
               </div>
               <div class="flex gap-1.5">
                 <button onclick="imprimirComandaMesero()" ${ordenActual.items.length === 0 ? 'disabled' : ''}
-                  class="px-2 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-medium active:scale-95 transition-transform disabled:opacity-40" title="Imprimir comanda">
-                  🖨️
-                </button>
+                  class="px-2 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-medium disabled:opacity-40" title="Imprimir comanda">🖨️</button>
                 <button onclick="enviarOrdenBtn()" ${ordenActual.items.length === 0 ? 'disabled' : ''}
                   class="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-2 rounded-xl text-sm active:scale-95 transition-transform disabled:opacity-40">
                   📤 ${ordenExistente ? 'T' + ((ordenExistente.tiempos?.length || 0) + 1) : 'Enviar'}
@@ -564,21 +551,17 @@
               </div>
             </div>
           </div>
+        </div>
       `;
     }
 
     function renderMisOrdenes() {
-      const esAdmin = usuarioData?.rol === 'admin';
       const activas = ordenes.filter(o => !['pagado', 'cancelado'].includes(o.estado));
-      const historial = todasLasOrdenes.filter(o => ['pagado','cancelado'].includes(o.estado)).slice(0, 20);
+      const historial = ordenes.filter(o => ['pagado', 'cancelado'].includes(o.estado)).slice(0, 10);
 
       return `
         <div class="p-3 space-y-3 overflow-y-auto h-full pb-2 no-scrollbar">
-          <div class="flex items-center justify-between">
-            <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wide">
-              Todas las Órdenes (${activas.length})
-            </h2>
-          </div>
+          <div class="flex items-center justify-between"><h2 class="text-sm font-bold text-gray-500 uppercase tracking-wide">Todas las Órdenes (${activas.length})</h2></div>
           
           ${activas.length === 0 ? `
             <div class="bg-white rounded-2xl p-8 text-center text-gray-400">
@@ -586,13 +569,11 @@
               <p>Sin órdenes activas</p>
             </div>
           ` : activas.map(o => `
-            <div class="bg-white rounded-xl p-3 ${o.estado === 'listo' ? 'ring-2 ring-green-500' : ''}">
-              <div class="flex items-start justify-between mb-2">
+            <div class="bg-white rounded-2xl p-4 ${o.estado === 'listo' ? 'ring-2 ring-green-500' : ''}">
+              <div class="flex items-start justify-between mb-3">
                 <div>
-                  <p class="font-bold text-sm">${o.mesa?.nombre || 'Mesa'}</p>
-                  <p class="text-gray-500 text-sm">#${o.numero} • ${o.tiempos?.length || 1} tiempo(s)
-                    ${esAdmin && o.meseroNombre ? '· 👤 ' + o.meseroNombre : ''}
-                  </p>
+                  <p class="font-bold text-lg">${o.mesa?.nombre || 'Mesa'}</p>
+                  <p class="text-gray-500 text-sm">#${o.numero} • ${o.tiempos?.length || 1} tiempo(s)</p>
                 </div>
                 <span class="px-3 py-1 rounded-full text-sm font-medium ${
                   o.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
@@ -610,7 +591,7 @@
               
               <!-- Mostrar tiempos -->
               ${(o.tiempos || []).map((tiempo, idx) => `
-                <div class="bg-gray-50 rounded-lg p-2 mb-1.5">
+                <div class="bg-gray-50 rounded-xl p-3 mb-2">
                   <p class="text-xs font-bold text-gray-500 mb-2">⏱️ Tiempo ${tiempo.numero} - ${new Date(tiempo.hora).toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit'})}</p>
                   <div class="space-y-1 text-sm">
                     ${tiempo.items.map(i => `
@@ -652,7 +633,7 @@
           ${historial.length > 0 ? `
             <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wide mt-6">Historial</h2>
             ${historial.map(o => `
-              <div class="bg-gray-50 rounded-xl p-3 opacity-60">
+              <div class="bg-gray-50 rounded-2xl p-4 opacity-60">
                 <div class="flex items-center justify-between">
                   <div>
                     <p class="font-medium">${o.mesa?.nombre} - #${o.numero}</p>
@@ -669,6 +650,7 @@
 
     function renderNavBottom() {
       const ordenesListas = ordenes.filter(o => o.estado === 'listo').length;
+      
       return `
         <nav class="bg-white border-t flex-shrink-0">
           <div class="flex">
@@ -681,7 +663,7 @@
               class="flex-1 py-2 flex items-center justify-center gap-2 relative ${vista === 'misOrdenes' ? 'text-amber-600 bg-amber-50' : 'text-gray-400'}">
               <span class="text-lg">📋</span>
               <span class="text-sm font-medium">Todas</span>
-              ${ordenesListas > 0 ? `<span class="ml-1 w-5 h-5 bg-green-500 rounded-full text-white text-xs flex items-center justify-center font-bold animate-pulse">${ordenesListas}</span>` : ''}
+              ${ordenesListas > 0 ? `<span class="ml-1 w-5 h-5 bg-green-500 rounded-full text-white text-xs flex items-center justify-center font-bold">${ordenesListas}</span>` : ''}
             </button>
           </div>
         </nav>
@@ -870,14 +852,25 @@
 
     window.setVista = (v) => { vista = v; render(); };
 
-    // ── IMPRIMIR COMANDA DESDE MESEROS ─────────────────────────
+    window.scrollCats = (dir) => {
+      const el = document.getElementById('cats-scroll');
+      if (el) el.scrollLeft += dir * 120;
+    };
+
+    window.setBusqueda = (v) => {
+      busqueda = v;
+      render();
+      const inp = document.querySelector('input[placeholder="Buscar producto..."]');
+      if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
+    };
+
+    // ── Imprimir comanda desde meseros ────────────────────────
     window.imprimirComandaMesero = () => {
       if (ordenActual.items.length === 0) return;
       const fecha = new Date();
       const ordenExistente = mesaSeleccionada ? buscarOrdenAbiertaMesa(mesaSeleccionada.id) : null;
       const tiempoNum = ordenExistente ? (ordenExistente.tiempos?.length || 0) + 1 : 1;
       const mesaNombre = mesaSeleccionada?.nombre || 'Mesa';
-
       let itemsHtml = '';
       ordenActual.items.forEach(function(item) {
         const mods = item.modificadores || [];
@@ -893,28 +886,20 @@
           + '<div><div style="font-size:10pt;font-weight:bold;">' + item.nombre + '</div>' + modsHtml + '</div>'
           + '</div>';
       });
-
-      const notaHtml = ordenActual.notas
-        ? '<div style="border:2px solid #000;padding:2mm;margin:2mm 0;text-align:center;font-size:8.5pt;">** NOTA: ' + ordenActual.notas + ' **</div>'
-        : '';
-
-      const LOGO = typeof LOGO_TICKET !== 'undefined' ? LOGO_TICKET : '';
+      const notaHtml = ordenActual.notas ? '<div style="border:2px solid #000;padding:2mm;margin:2mm 0;text-align:center;font-size:8.5pt;">NOTA: ' + ordenActual.notas + '</div>' : '';
       const ticketHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
-        + '@page{size:80mm auto;margin:0mm}'
-        + '*{margin:0;padding:0;box-sizing:border-box}'
+        + '@page{size:80mm auto;margin:0mm}*{margin:0;padding:0;box-sizing:border-box}'
         + 'body{font-family:"Courier New",Courier,monospace;font-size:9pt;line-height:1.35;width:80mm;max-width:80mm;padding:2mm 3mm 4mm 3mm;background:#fff;color:#000}'
         + '</style></head><body>'
-        + (LOGO ? '<div style="text-align:center;margin-bottom:2mm;padding-bottom:2mm;border-bottom:1px dashed #000;"><img src="' + LOGO + '" style="width:40mm;height:auto;display:block;margin:0 auto 1.5mm;" alt=""><div style="font-size:12pt;font-weight:bold;">COMANDA</div></div>' : '<div style="text-align:center;font-size:14pt;font-weight:bold;border-bottom:1px dashed #000;padding-bottom:2mm;margin-bottom:2mm;">COMANDA</div>')
-        + '<div style="font-size:28pt;font-weight:bold;text-align:center;margin:2mm 0;">' + mesaNombre + '</div>'
+        + '<div style="text-align:center;font-size:14pt;font-weight:bold;border-bottom:1px dashed #000;padding-bottom:2mm;margin-bottom:2mm;">COMANDA</div>'
+        + '<div style="font-size:28pt;font-weight:bold;text-align:center;margin:2mm 0">' + mesaNombre + '</div>'
         + '<div style="border:2px solid #000;text-align:center;padding:1.5mm;margin-bottom:1.5mm;font-size:10pt;font-weight:bold;">TIEMPO ' + tiempoNum + '</div>'
         + '<div style="display:flex;justify-content:space-between;font-size:8.5pt;padding:0.5mm 0;border-bottom:1px dashed #000;margin-bottom:1.5mm;">'
-        + '<span>Mesero: ' + (mesero?.nombre || '') + '</span>'
+        + '<span>' + (nombreMeseroActual || mesero?.nombre || '') + '</span>'
         + '<span>' + fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) + '</span></div>'
-        + itemsHtml
-        + notaHtml
+        + itemsHtml + notaHtml
         + '<div style="text-align:center;margin-top:3mm;padding-top:2mm;border-top:1px dashed #000;font-size:7.5pt;">' + fecha.toLocaleDateString('es-MX') + '</div>'
         + '</body></html>';
-
       let iframe = document.getElementById('print-iframe-mesero');
       if (!iframe) {
         iframe = document.createElement('iframe');
@@ -935,13 +920,7 @@
       };
     };
 
-
-    window.scrollCats = (dir) => {
-      const el = document.getElementById('cats-scroll');
-      if (el) el.scrollLeft += dir * 120;
-    };
-
-    // ── EDITAR ORDEN (solo admin) ──────────────────────────────
+    // ── Editar orden ──────────────────────────────────────────
     window.abrirEditorOrden = (ordenId) => {
       const orden = todasLasOrdenes.find(o => o.id === ordenId);
       if (!orden) return;
@@ -964,11 +943,9 @@
       const orden = window.ordenEditando;
       const items = window.ordenEditandoItems || [];
       if (!orden) return;
-
       const modal = document.createElement('div');
       modal.id = 'modal-editor-orden';
       modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4';
-
       const itemsHtml = items.map((item, idx) => `
         <div class="flex items-center gap-2 py-2 border-b border-gray-100">
           <div class="flex items-center gap-1 flex-shrink-0">
@@ -979,60 +956,48 @@
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium">${item.nombre}</p>
             ${item.modificadoresTexto ? `<p class="text-xs text-amber-600">↳ ${item.modificadoresTexto}</p>` : ''}
-            <p class="text-xs text-gray-400">Tiempo ${item._tiempoNum} · $${(item.precioFinal || item.precio).toFixed(2)}</p>
+            <p class="text-xs text-gray-400">T${item._tiempoNum} · $${(item.precioFinal || item.precio || 0).toFixed(2)}</p>
           </div>
           <button onclick="eliminarItemEditor(${idx})" class="text-red-400 hover:text-red-600 text-lg flex-shrink-0">🗑</button>
         </div>
       `).join('');
-
       modal.innerHTML = `
         <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
           <div class="p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-t-2xl flex justify-between items-center">
-            <div>
-              <p class="font-bold">✏️ Editar Orden Admin</p>
-              <p class="text-xs opacity-80">${orden.mesa?.nombre || ''} · #${orden.numero}</p>
-            </div>
+            <div><p class="font-bold">✏️ Editar Orden</p><p class="text-xs opacity-80">${orden.mesa?.nombre || ''} · #${orden.numero}</p></div>
             <button onclick="document.getElementById('modal-editor-orden').remove()" class="p-1 hover:bg-white/20 rounded-lg text-xl">✕</button>
           </div>
           <div class="flex-1 overflow-y-auto p-4">
-            <p class="text-xs text-gray-400 mb-3">Modifica cantidades o elimina productos. Los cambios se aplican a toda la orden.</p>
+            <p class="text-xs text-gray-400 mb-3">Modifica cantidades o elimina productos.</p>
             ${items.length === 0 ? '<p class="text-center text-gray-400 py-4">Sin productos</p>' : itemsHtml}
           </div>
           <div class="p-4 border-t space-y-2">
-            <div>
-              <label class="text-xs text-gray-500">Nota general</label>
-              <input type="text" id="edit-nota-orden" value="${orden.notas || ''}" placeholder="Nota para cocina..." class="w-full mt-1 p-2 border rounded-lg text-sm">
-            </div>
+            <div><label class="text-xs text-gray-500">Nota general</label>
+              <input type="text" id="edit-nota-orden" value="${orden.notas || ''}" placeholder="Nota para cocina..." class="w-full mt-1 p-2 border rounded-lg text-sm"></div>
             <div class="flex gap-2">
               <button onclick="document.getElementById('modal-editor-orden').remove()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium text-sm">Cancelar</button>
-              <button onclick="guardarEdicionOrden()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold text-sm">💾 Guardar cambios</button>
+              <button onclick="guardarEdicionOrden()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold text-sm">💾 Guardar</button>
             </div>
           </div>
-        </div>
-      `;
+        </div>`;
       document.body.appendChild(modal);
     }
 
     window.cambiarItemEditor = (idx, delta) => {
       if (!window.ordenEditandoItems) return;
       window.ordenEditandoItems[idx].cantidad = Math.max(0, (window.ordenEditandoItems[idx].cantidad || 1) + delta);
-      if (window.ordenEditandoItems[idx].cantidad === 0) {
-        window.ordenEditandoItems.splice(idx, 1);
-      }
+      if (window.ordenEditandoItems[idx].cantidad === 0) window.ordenEditandoItems.splice(idx, 1);
       renderModalEditorOrden();
     };
-
     window.eliminarItemEditor = (idx) => {
       if (!window.ordenEditandoItems) return;
       window.ordenEditandoItems.splice(idx, 1);
       renderModalEditorOrden();
     };
-
     window.guardarEdicionOrden = async () => {
       const orden = window.ordenEditando;
       const items = window.ordenEditandoItems || [];
       const nota = document.getElementById('edit-nota-orden')?.value?.trim() || '';
-
       if (items.length === 0) {
         if (!confirm('No hay productos. ¿Cancelar la orden completa?')) return;
         try {
@@ -1042,52 +1007,67 @@
         } catch(e) { alert('Error: ' + e.message); }
         return;
       }
-
-      // Recalcular total y reconstruir tiempos
       const nuevoTotal = items.reduce((s, i) => s + (i.precioFinal || i.precio) * i.cantidad, 0);
       let tiemposActualizados = null;
       if (orden.tiempos && orden.tiempos.length > 0) {
-        // Agrupar items editados por tiempo
         const porTiempo = {};
-        items.forEach(i => {
-          const t = i._tiempoNum || 1;
-          if (!porTiempo[t]) porTiempo[t] = [];
-          porTiempo[t].push(i);
-        });
-        tiemposActualizados = orden.tiempos
-          .map(t => ({ ...t, items: porTiempo[t.numero] || [] }))
-          .filter(t => t.items.length > 0);
+        items.forEach(i => { const t = i._tiempoNum || 1; if (!porTiempo[t]) porTiempo[t] = []; porTiempo[t].push(i); });
+        tiemposActualizados = orden.tiempos.map(t => ({ ...t, items: porTiempo[t.numero] || [] })).filter(t => t.items.length > 0);
       }
-
       try {
         const updates = { total: nuevoTotal, notas: nota, items, fechaActualizacion: serverTimestamp() };
         if (tiemposActualizados) updates.tiempos = tiemposActualizados;
         await updateDoc(doc(db, 'ordenesRestaurante', orden.id), updates);
         document.getElementById('modal-editor-orden')?.remove();
-        window.ordenEditando = null;
-        window.ordenEditandoItems = null;
+        window.ordenEditando = null; window.ordenEditandoItems = null;
         alert('✅ Orden actualizada');
       } catch(e) { alert('Error: ' + e.message); }
     };
 
-    window.setCategoria = (c) => { categoriaActiva = c; busqueda = ''; render(); };
-    window.setBusqueda = (v) => {
-      busqueda = v; // guardar sin toLowerCase (se aplica al filtrar)
-      render();
-      // Restaurar foco y posición del cursor en el buscador
-      const inp = document.querySelector('input[placeholder="Buscar producto..."]');
-      if (inp) {
-        inp.focus();
-        const pos = v.length;
-        inp.setSelectionRange(pos, pos);
-      }
+    // ── Separar bebidas al enviar ─────────────────────────────
+    const esBebidaFn = (item) => {
+      const cat = (item.categoria || '').toLowerCase();
+      return cat.includes('bebida') || cat.includes('refresco') || cat.includes('drink');
     };
 
+    window.setCategoria = (c) => { categoriaActiva = c; busqueda = ''; render(); };
+
     window.seleccionarMesa = (id) => {
-      mesaSeleccionada = MESAS.find(m => m.id === id);
+      const mesa = MESAS.find(m => m.id === id);
+      const ordenExist = buscarOrdenAbiertaMesa(id);
+      if (ordenExist) {
+        mesaSeleccionada = mesa;
+        ordenActual = { items: [], mesa, notas: '' };
+        vista = 'orden'; render();
+      } else { mostrarModalNombreMesero(mesa); }
+    };
+
+    function mostrarModalNombreMesero(mesa) {
+      document.getElementById('modal-nombre-mesero')?.remove();
+      const modal = document.createElement('div');
+      modal.id = 'modal-nombre-mesero';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:50;display:flex;align-items:center;justify-content:center;padding:12px';
+      modal.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:360px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">'
+        + '<div style="background:linear-gradient(to right,#f59e0b,#ea580c);padding:14px 16px;color:#fff"><p style="font-weight:700;font-size:1rem;margin:0">' + mesa.nombre + '</p><p style="font-size:0.8rem;opacity:0.85;margin:2px 0 0">¿Quién toma la orden?</p></div>'
+        + '<div style="padding:16px"><p style="font-size:0.82rem;color:#6b7280;margin-bottom:8px">Escribe tu nombre para identificar la comanda</p>'
+        + '<input id="input-nombre-mesero" type="text" placeholder="Tu nombre..." style="width:100%;padding:10px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:0.95rem;outline:none;box-sizing:border-box" onkeydown="if(event.key===\'Enter\')confirmarNombreMesero()" />'
+        + '<div style="display:flex;gap:8px;margin-top:12px">'
+        + '<button onclick="document.getElementById(\'modal-nombre-mesero\').remove()" style="flex:1;padding:10px;background:#f3f4f6;border:none;border-radius:10px;font-weight:600;cursor:pointer">Cancelar</button>'
+        + '<button onclick="confirmarNombreMesero()" style="flex:1;padding:10px;background:linear-gradient(to right,#f59e0b,#ea580c);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Entrar →</button>'
+        + '</div></div></div>';
+      document.body.appendChild(modal);
+      setTimeout(() => document.getElementById('input-nombre-mesero')?.focus(), 100);
+      window._mesaPendiente = mesa;
+    }
+
+    window.confirmarNombreMesero = () => {
+      const nombre = document.getElementById('input-nombre-mesero')?.value?.trim();
+      if (!nombre) { document.getElementById('input-nombre-mesero').style.borderColor = '#ef4444'; return; }
+      document.getElementById('modal-nombre-mesero')?.remove();
+      nombreMeseroActual = nombre;
+      mesaSeleccionada = window._mesaPendiente;
       ordenActual = { items: [], mesa: mesaSeleccionada, notas: '' };
-      vista = 'orden';
-      render();
+      vista = 'orden'; render();
     };
 
     window.volverMesas = () => {
@@ -1157,63 +1137,57 @@
       
       const modal = document.createElement('div');
       modal.id = 'modal-modificadores';
-      // Centrado en pantalla, sin animación de slide
       modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:50;display:flex;align-items:center;justify-content:center;padding:8px';
       modal.onclick = (e) => { if (e.target === modal) cerrarModalMods(); };
       
-      const gruposHTML = modificadores.map((grupo, gIdx) => {
-        const opcionesHTML = grupo.opciones.map((opcion, oIdx) => `
-          <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#fff;border-radius:10px;cursor:pointer;border:1px solid #e5e7eb;margin-bottom:6px">
-            <div style="display:flex;align-items:center;gap:10px">
-              <input type="${grupo.tipo}" name="grupo_${gIdx}" id="mod_${gIdx}_${oIdx}"
-                ${opcion.default ? 'checked' : ''}
-                onchange="toggleMod(${gIdx}, ${oIdx}, '${grupo.tipo}')"
-                style="width:18px;height:18px;accent-color:#f59e0b;cursor:pointer;flex-shrink:0" />
-              <span style="font-size:0.9rem;font-weight:500;color:#1f2937">${opcion.nombre}</span>
-            </div>
-            ${opcion.precio > 0
-              ? `<span style="color:#d97706;font-weight:700;font-size:0.85rem">+${fmt(opcion.precio)}</span>`
-              : `<span style="color:#16a34a;font-size:0.8rem">incluido</span>`}
-          </label>`
-        ).join('');
-        return `
-          <div style="background:#f9fafb;border-radius:12px;padding:12px;margin-bottom:10px">
-            <p style="font-weight:700;font-size:0.82rem;color:#374151;margin-bottom:8px">
-              ${grupo.tipo === 'radio' ? '◉' : '☐'} ${grupo.nombre}
-              <span style="font-weight:400;color:#9ca3af;font-size:0.75rem">&nbsp;${grupo.tipo === 'radio' ? '(elige una)' : '(opcional)'}</span>
-            </p>
-            ${opcionesHTML}
-          </div>`;
-      }).join('');
-
       modal.innerHTML = `
-        <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
-          <!-- Header fijo -->
-          <div style="padding:14px 16px;border-bottom:1px solid #e5e7eb;background:#fff;flex-shrink:0">
-            <div style="display:flex;align-items:center;justify-content:space-between">
+<div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+          <div class="p-4 border-b sticky top-0 bg-white z-10">
+            <div class="flex items-center justify-between">
               <div>
-                <h3 style="font-weight:700;font-size:1rem;margin:0">${producto.nombre}</h3>
-                <p style="color:#d97706;font-weight:600;margin:2px 0 0;font-size:0.9rem">${fmt(producto.precio)}</p>
+                <h3 class="font-bold text-lg">${producto.nombre}</h3>
+                <p class="text-amber-600 font-medium">${fmt(producto.precio)}</p>
               </div>
-              <button onclick="cerrarModalMods()"
-                style="width:36px;height:36px;background:#f3f4f6;border:none;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+              <button onclick="cerrarModalMods()" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">✕</button>
             </div>
           </div>
-
-          <!-- Opciones con scroll libre -->
-          <div style="flex:1;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch">
-            ${gruposHTML}
+          
+          <div class="p-4 overflow-y-auto max-h-[55vh] space-y-4">
+            ${modificadores.map((grupo, gIdx) => `
+              <div class="bg-gray-50 rounded-2xl p-4">
+                <p class="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                  ${grupo.tipo === 'radio' ? '○' : '☐'} ${grupo.nombre} 
+                  <span class="text-xs font-normal text-gray-400">${grupo.tipo === 'radio' ? '(elige una)' : '(opcional)'}</span>
+                </p>
+                <div class="space-y-2">
+                  ${grupo.opciones.map((opcion, oIdx) => `
+                    <label class="flex items-center justify-between p-3 bg-white rounded-xl cursor-pointer active:bg-amber-50 transition-colors">
+                      <div class="flex items-center gap-3">
+                        <input type="${grupo.tipo}" 
+                          name="grupo_${gIdx}" 
+                          id="mod_${gIdx}_${oIdx}"
+                          ${opcion.default ? 'checked' : ''}
+                          onchange="toggleMod(${gIdx}, ${oIdx}, '${grupo.tipo}')"
+                          class="w-5 h-5 accent-amber-500" />
+                        <span class="font-medium text-gray-800">${opcion.nombre}</span>
+                      </div>
+                      ${opcion.precio > 0 ? `<span class="text-amber-600 font-bold">+${fmt(opcion.precio)}</span>` : 
+                        `<span class="text-green-600 text-sm">incluido</span>`}
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
           </div>
-
-          <!-- Footer fijo -->
-          <div style="padding:12px 14px;border-top:1px solid #e5e7eb;background:#fff;flex-shrink:0">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-              <span style="color:#6b7280;font-size:0.9rem">Total:</span>
-              <span id="precio-con-mods" style="font-size:1.4rem;font-weight:700;color:#d97706">${fmt(producto.precio)}</span>
+          
+          <div class="p-4 border-t bg-white sticky bottom-0">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-gray-600">Precio total:</span>
+              <span id="precio-con-mods" class="text-2xl font-bold text-amber-600">${fmt(producto.precio)}</span>
             </div>
-            <button onclick="confirmarConMods()"
-              style="width:100%;background:linear-gradient(to right,#f59e0b,#ea580c);color:#fff;font-weight:700;font-size:1rem;padding:13px;border:none;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-              ➕ Agregar a la orden
+            <button onclick="confirmarConMods()" 
+              class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold py-4 rounded-xl active:scale-95 transition-transform flex items-center justify-center gap-2">
+              <span class="text-xl">➕</span> Agregar a la orden
             </button>
           </div>
         </div>
@@ -1333,15 +1307,6 @@
     });
 
     render();
-  </script>
-
-  <script>
-    // Limpia Service Workers anteriores que puedan interferir con Firebase
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        registrations.forEach(function(reg) { reg.unregister(); });
-      });
-    }
   </script>
 </body>
 </html>
